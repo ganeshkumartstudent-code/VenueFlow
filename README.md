@@ -137,3 +137,9 @@ By optimizing movement, we reduce idle time (and associated carbon footprint) an
 
 **VenueFlow AI — Smart Venue Management**
 
+---
+
+## 🏆 Competition Context
+**VenueFlow AI** was developed for the **Virtual Prompts** event conducted by **Hack2Skill**. The project serves as a comprehensive showcase of **Google Cloud Solutions** being used to solve real-world urban safety and congestion challenges.
+
+---
