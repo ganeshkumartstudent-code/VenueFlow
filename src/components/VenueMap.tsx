@@ -1,16 +1,13 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  APIProvider,
   Map,
-  AdvancedMarker,
   Marker,
   InfoWindow,
-  useMap,
-  useMapsLibrary
 } from '@vis.gl/react-google-maps';
 import { Button } from '@/components/ui/button';
 import { Clock, Users, Navigation as NavIcon } from 'lucide-react';
-import { db, collection, onSnapshot } from '@/lib/firebase';
+import { useNavigation } from '@/hooks/useNavigation';
+import { useCrowdData } from '@/hooks/useCrowdData';
 
 const STADIUM_CENTER = { lat: 33.9535, lng: -118.3392 };
 
@@ -25,68 +22,7 @@ const SECTOR_COORDS = [
   { id: 'S8', paths: [{ lat: 33.9525, lng: -118.3382 }, { lat: 33.9520, lng: -118.3392 }, { lat: 33.9525, lng: -118.3402 }] },
 ];
 
-interface DirectionsProps {
-  destination: google.maps.LatLngLiteral | null;
-  userLocation: google.maps.LatLngLiteral | null;
-}
-
-const Directions = ({ destination, userLocation }: DirectionsProps) => {
-  const map = useMap();
-  const routesLibrary = useMapsLibrary('routes');
-  const geometryLibrary = useMapsLibrary('geometry');
-  const [route, setRoute] = useState<google.maps.DirectionsRoute | null>(null);
-  const polylineRef = React.useRef<google.maps.Polyline | null>(null);
-
-  useEffect(() => {
-    if (!routesLibrary || !geometryLibrary || !map || !destination || !userLocation) {
-      if (polylineRef.current) polylineRef.current.setMap(null);
-      return;
-    }
-
-    const service = new routesLibrary.DirectionsService();
-    
-    // Check if user is too far from stadium (e.g. testing from home)
-    // If > 10km, use a mock starting point for the demo
-    const distanceToStadium = geometryLibrary.spherical.computeDistanceBetween(
-      userLocation,
-      STADIUM_CENTER
-    );
-
-    const actualOrigin = distanceToStadium > 10000 
-      ? { lat: STADIUM_CENTER.lat + 0.005, lng: STADIUM_CENTER.lng + 0.005 }
-      : userLocation;
-
-    service.route({
-      origin: actualOrigin,
-      destination: destination,
-      travelMode: google.maps.TravelMode.WALKING,
-    }, (result, status) => {
-      if (status === 'OK' && result && result.routes[0]) {
-        setRoute(result.routes[0]);
-        if (polylineRef.current) polylineRef.current.setMap(null);
-        polylineRef.current = new google.maps.Polyline({
-          path: result.routes[0].overview_path,
-          geodesic: true,
-          strokeColor: '#3b82f6',
-          strokeOpacity: 0.9,
-          strokeWeight: 8,
-          map: map
-        });
-      } else {
-        console.warn("Directions request returned no results or failed:", status);
-      }
-    });
-
-    return () => {
-      if (polylineRef.current) polylineRef.current.setMap(null);
-    };
-  }, [routesLibrary, geometryLibrary, map, destination, userLocation]);
-
-  return null;
-};
-
 interface SectorOverlayProps {
-  key?: string;
   sector: { id: string; paths: google.maps.LatLngLiteral[] };
   density: number;
   waitTime: number;
@@ -94,36 +30,22 @@ interface SectorOverlayProps {
 }
 
 const SectorOverlay = ({ sector, density, waitTime, onNavigate }: SectorOverlayProps) => {
-  const map = useMap();
   const [infoWindowOpen, setInfoWindowOpen] = useState(false);
-
   const getColor = (d: number) => {
     if (d > 80) return '#ef4444';
     if (d > 50) return '#f59e0b';
     return '#22c55e';
   };
 
-  useEffect(() => {
-    if (!map) return;
-    const poly = new google.maps.Polygon({
-      paths: sector.paths,
-      strokeColor: getColor(density),
-      strokeOpacity: 0.8,
-      strokeWeight: 2,
-      fillColor: getColor(density),
-      fillOpacity: 0.35,
-      map: map
-    });
-
-    poly.addListener('click', () => setInfoWindowOpen(true));
-
-    return () => poly.setMap(null);
-  }, [map, density, sector.paths]);
-
   const center = sector.paths[0];
 
   return (
     <>
+      <Marker 
+        position={center} 
+        onClick={() => setInfoWindowOpen(true)}
+        opacity={0} // Hidden marker just to anchor the info window
+      />
       {infoWindowOpen && (
         <InfoWindow position={center} onCloseClick={() => setInfoWindowOpen(false)}>
           <div className="p-2 text-zinc-900">
@@ -162,15 +84,15 @@ function VenueMap({
   userLocation?: google.maps.LatLngLiteral | null;
   isSimulating?: boolean;
 }) {
+  const [navDestination, setNavDestination] = useState<google.maps.LatLngLiteral | null>(null);
   const handleNavigate = useCallback((pos: google.maps.LatLngLiteral) => setNavDestination(pos), []);
   const [internalLocation, setInternalLocation] = useState<google.maps.LatLngLiteral | null>(null);
-  const [navDestination, setNavDestination] = useState<google.maps.LatLngLiteral | null>(null);
-  const [sectorData, setSectorData] = useState<Record<string, { density: number; waitTime: number }>>({});
   const [mapReady, setMapReady] = useState(false);
-  const geometryLibrary = useMapsLibrary('geometry');
-
-  // Use external location if provided, otherwise internal geolocation
+  
+  const { sectors } = useCrowdData();
   const userLocation = externalLocation || internalLocation;
+  
+  useNavigation(navDestination, userLocation);
 
   useEffect(() => {
     if (!externalLocation && navigator.geolocation) {
@@ -181,22 +103,6 @@ function VenueMap({
         });
       });
     }
-
-    const unsubscribe = onSnapshot(collection(db, 'queues'), (snapshot) => {
-      const data: Record<string, { density: number; waitTime: number }> = {};
-      snapshot.docs.forEach(doc => {
-        const q = doc.data();
-        if (q.sectorId) {
-          data[q.sectorId] = {
-            density: q.density || Math.floor(Math.random() * 100),
-            waitTime: q.waitTime || 0
-          };
-        }
-      });
-      setSectorData(data);
-    });
-
-    return () => unsubscribe();
   }, [externalLocation]);
 
   return (
@@ -218,17 +124,18 @@ function VenueMap({
             />
           )}
 
-          {mapReady && SECTOR_COORDS.map(s => (
-            <SectorOverlay 
-              key={s.id} 
-              sector={s} 
-              density={sectorData[s.id]?.density || 20} 
-              waitTime={sectorData[s.id]?.waitTime || 5}
-              onNavigate={handleNavigate}
-            />
-          ))}
-
-          {mapReady && <Directions destination={navDestination} userLocation={userLocation} />}
+          {mapReady && SECTOR_COORDS.map(s => {
+            const data = sectors.find(sec => sec.id === s.id);
+            return (
+              <SectorOverlay 
+                key={s.id} 
+                sector={s} 
+                density={data?.density || 20} 
+                waitTime={data?.waitTime || 5}
+                onNavigate={handleNavigate}
+              />
+            );
+          })}
         </Map>
 
         <div className="absolute top-4 left-4 flex flex-col gap-2">

@@ -8,8 +8,11 @@ import { toast } from 'sonner';
 import { SkeletonChart } from './StatusUI';
 import { GLOBAL_REALTIME_DATA } from '@/lib/mockData';
 
+import { useCrowdData } from '@/hooks/useCrowdData';
+
 function AdminAnalytics() {
   const [loading, setLoading] = useState(true);
+  const { sectors } = useCrowdData();
   const [data, setData] = useState<{
     waitTime: any[];
     density: any[];
@@ -35,17 +38,17 @@ function AdminAnalytics() {
       toast.success("BigQuery Analytics Synced");
     } catch (error) {
       console.warn("Analytics fetch error, falling back to mock data:", error);
-      // Mock Fallback for Demo - USING GLOBAL SYNC DATA
+      // Mock Fallback using centralised hook data
       setData({
-        waitTime: GLOBAL_REALTIME_DATA.sectors.map(s => ({
+        waitTime: sectors.map(s => ({
           sectorId: s.id,
-          avgWait: s.waitTime,
-          wait: s.waitTime
+          avgWait: s.waitTime || 5,
+          wait: s.waitTime || 5
         })),
-        density: GLOBAL_REALTIME_DATA.sectors.map(s => ({
+        density: sectors.map(s => ({
           sectorId: s.id,
-          peakDensity: s.density,
-          density: s.density
+          peakDensity: s.density || 20,
+          density: s.density || 20
         })),
         efficiency: { rate: 0.78, completed: 42, total: 54 }
       });
@@ -53,7 +56,7 @@ function AdminAnalytics() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sectors]);
 
   useEffect(() => {
     fetchAnalytics();

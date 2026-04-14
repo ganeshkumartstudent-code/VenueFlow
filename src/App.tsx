@@ -24,6 +24,16 @@ function AppContent() {
   const { user, profile, loading, loginAsGuest } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
 
+  // Dynamic SEO Title
+  React.useEffect(() => {
+    const titles: Record<string, string> = {
+      home: 'Attendee View | VenueFlow AI',
+      staff: 'Staff Dashboard | VenueFlow AI',
+      admin: 'Admin Analytics | VenueFlow AI'
+    };
+    document.title = titles[activeTab] || 'VenueFlow AI';
+  }, [activeTab]);
+
   if (loading) {
     return (
       /*

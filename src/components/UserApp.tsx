@@ -20,26 +20,28 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 // colour-blind and screen-reader users.
 const DENSITY_LABELS: Record<number, string> = {};
 
+import { useCrowdData } from '@/hooks/useCrowdData';
+
 export default function UserApp() {
+  const { queues, loading: queuesLoading } = useCrowdData();
   const [mode, setMode] = useState<'map' | 'ar' | 'chat'>('map');
   const [messages, setMessages] = useState<{ role: 'user' | 'ai', text: string }[]>([]);
   const [input, setInput] = useState('');
-  const [queues, setQueues] = useState<any[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulatedLocation, setSimulatedLocation] = useState<google.maps.LatLngLiteral | null>(null);
-  // FIX: ref for focus management — move focus into chat when mode changes
+  
   const chatInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Simulation Logic: Move the user in a circle near the stadium for the demo
+  // Simulation Logic: Move the user in a circle near the stadium
   useEffect(() => {
     let interval: any;
     if (isSimulating) {
       let angle = 0;
       interval = setInterval(() => {
-        const radius = 0.005; // ~500m
+        const radius = 0.005; 
         const center = { lat: 33.9535, lng: -118.3392 };
         setSimulatedLocation({
           lat: center.lat + Math.cos(angle) * radius,
@@ -80,34 +82,6 @@ export default function UserApp() {
       setIsSpeaking(false);
     }
   };
-
-  const [queuesLoading, setQueuesLoading] = useState(true);
-
-  useEffect(() => {
-    const q = query(collection(db, 'queues'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      let allQueues = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      // FALLBACK: If Firestore is empty, use global realtime data
-      if (allQueues.length === 0) {
-        allQueues = (GLOBAL_REALTIME_DATA.queues || []) as any[];
-      }
-
-      // Sort manually in JS to avoid index requirement
-      const sorted = (allQueues as any[]).sort((a: any, b: any) => (a.waitTime || 0) - (b.waitTime || 0)).slice(0, 5);
-      setQueues(sorted);
-      setQueuesLoading(false);
-    }, (error) => {
-      console.error("Queues fetch error:", error);
-      setQueuesLoading(false);
-    });
-    
-    const timeout = setTimeout(() => setQueuesLoading(false), 5000);
-    return () => {
-      unsubscribe();
-      clearTimeout(timeout);
-    };
-  }, []);
 
   // FIX: Move focus into chat input when chat mode is activated
   useEffect(() => {

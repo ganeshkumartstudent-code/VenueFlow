@@ -21,13 +21,16 @@ const getDensityLabel = (density: number) => {
   return 'low';
 };
 
+import { useCrowdData } from '@/hooks/useCrowdData';
+
 function StaffDashboard() {
   const shouldReduceMotion = useReducedMotion();
   const { profile } = useAuth();
+  const { sectors } = useCrowdData();
   const [tasks, setTasks] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [predictions, setPredictions] = useState<any[]>(
-    GLOBAL_REALTIME_DATA.sectors.map(s => ({
+    sectors.map(s => ({
       sectorId: s.id,
       predictedDensity: s.density,
       recommendation: s.density > 80 ? 'Critical' : 'Stable'
