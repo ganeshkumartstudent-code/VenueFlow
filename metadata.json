@@ -1,0 +1,5 @@
+{
+  "name": "VenueFlow AI",
+  "description": "AI-driven crowd management and predictive navigation for large-scale venues. Features real-time heatmaps, queue optimization, and agentic staff coordination.",
+  "requestFramePermissions": ["camera", "geolocation"]
+}

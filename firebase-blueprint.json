@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Application user profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["attendee", "staff", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Venue": {
+      "title": "Venue",
+      "description": "Stadium or event venue details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "capacity": { "type": "number" },
+        "sectors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "density": { "type": "number", "description": "Current crowd density percentage" },
+              "capacity": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "Queue": {
+      "title": "Queue",
+      "description": "Real-time queue status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "venueId": { "type": "string" },
+        "sectorId": { "type": "string" },
+        "type": { "type": "string", "enum": ["concession", "entry", "exit", "restroom"] },
+        "waitTime": { "type": "number", "description": "Estimated wait time in minutes" },
+        "length": { "type": "number" },
+        "status": { "type": "string", "enum": ["open", "closed", "busy"] }
+      }
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Staff coordination task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "assignedTo": { "type": "string", "description": "Staff UID" },
+        "status": { "type": "string", "enum": ["pending", "in-progress", "completed"] },
+        "description": { "type": "string" },
+        "location": { "type": "string" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Coordination chat message",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "channel": { "type": "string", "enum": ["staff", "all"] }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "User", "description": "User profiles" },
+    "/venues/{venueId}": { "schema": "Venue", "description": "Venue data" },
+    "/queues/{queueId}": { "schema": "Queue", "description": "Queue statuses" },
+    "/tasks/{taskId}": { "schema": "Task", "description": "Staff tasks" },
+    "/messages/{messageId}": { "schema": "Message", "description": "Chat messages" }
+  }
+}
