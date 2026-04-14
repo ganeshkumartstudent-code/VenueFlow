@@ -5,13 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ShieldAlert, Users, MessageSquare, CheckCircle2, AlertCircle, TrendingUp, Map as MapIcon } from 'lucide-react';
 import { db, collection, onSnapshot, query, orderBy, limit, addDoc, serverTimestamp, updateDoc, doc, where } from '@/lib/firebase';
-import { useAuth } from '@/AuthProvider';
+import { useAuth } from '@/contexts/AuthContext';
 import { getCrowdPrediction } from '@/lib/gemini';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { SkeletonHeatmap, EmptyState } from './StatusUI';
 import { Inbox } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
+import { GLOBAL_DEMO_DATA } from '@/lib/mockData';
 
 // FIX: Helper maps density number → accessible label
 const getDensityLabel = (density: number) => {
@@ -25,7 +26,13 @@ function StaffDashboard() {
   const { profile } = useAuth();
   const [tasks, setTasks] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
-  const [predictions, setPredictions] = useState<any[]>([]);
+  const [predictions, setPredictions] = useState<any[]>(
+    GLOBAL_DEMO_DATA.sectors.map(s => ({
+      sectorId: s.id,
+      predictedDensity: s.density,
+      recommendation: s.density > 80 ? 'Critical' : 'Stable'
+    }))
+  );
   const [loading, setLoading] = useState(false);
   // FIX: ref for chat input — associate with label
   const chatInputRef = useRef<HTMLInputElement>(null);

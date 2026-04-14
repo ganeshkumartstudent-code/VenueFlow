@@ -5,7 +5,7 @@ import { onSnapshot } from 'firebase/firestore';
 import React from 'react';
 
 // Mock Auth context for UserApp
-vi.mock('@/AuthProvider', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { uid: '123' }, profile: { role: 'attendee' }, loading: false })
 }));
 

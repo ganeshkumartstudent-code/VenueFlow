@@ -4,7 +4,7 @@ import StaffDashboard from './StaffDashboard';
 import React from 'react';
 
 // Mock Auth context
-vi.mock('@/AuthProvider', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ profile: { role: 'staff' } })
 }));
 

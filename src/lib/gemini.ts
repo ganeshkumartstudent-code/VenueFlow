@@ -6,14 +6,17 @@ import { sanitizeInput } from './sanitizer';
  * Calls the secure backend Cloud Function for Gemini AI processing.
  * This ensures the API key remains server-side and applies rate limiting.
  */
-export async function askGemini(prompt: string) {
+export async function askGemini(prompt: string, systemInstruction?: string) {
   try {
     // 1. Sanitize user input before sending to backend
     const cleanPrompt = sanitizeInput(prompt);
 
     // 2. Call the deployed Cloud Function
     const callGemini = httpsCallable(functions, 'callGemini');
-    const result = await callGemini({ prompt: cleanPrompt });
+    const result = await callGemini({ 
+      prompt: cleanPrompt,
+      systemInstruction 
+    });
     
     return (result.data as { text: string }).text;
   } catch (error: any) {
@@ -41,7 +44,10 @@ export async function getCrowdPrediction(sensorData: any) {
     const callGemini = httpsCallable(functions, 'callGemini');
     const prompt = `Based on this sensor data: ${JSON.stringify(sensorData)}, predict crowd density. Return JSON { "predictions": [...] }`;
     
-    const result = await callGemini({ prompt });
+    const result = await callGemini({ 
+      prompt,
+      config: { responseMimeType: 'application/json' }
+    });
     const data = (result.data as { text: string }).text;
     
     // Attempt to parse JSON from AI response

@@ -3,6 +3,7 @@ import {
   APIProvider,
   Map,
   AdvancedMarker,
+  Marker,
   InfoWindow,
   useMap,
   useMapsLibrary
@@ -32,36 +33,60 @@ interface DirectionsProps {
 const Directions = ({ destination, userLocation }: DirectionsProps) => {
   const map = useMap();
   const routesLibrary = useMapsLibrary('routes');
-  const [directionsService, setDirectionsService] = useState<google.maps.DirectionsService>();
-  const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer>();
+  const geometryLibrary = useMapsLibrary('geometry');
+  const [route, setRoute] = useState<google.maps.DirectionsRoute | null>(null);
+  const polylineRef = React.useRef<google.maps.Polyline | null>(null);
 
   useEffect(() => {
-    if (!routesLibrary || !map) return;
-    setDirectionsService(new routesLibrary.DirectionsService());
-    setDirectionsRenderer(new routesLibrary.DirectionsRenderer({ map }));
-  }, [routesLibrary, map]);
-
-  useEffect(() => {
-    if (!directionsService || !directionsRenderer || !destination || !userLocation) {
-      if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
+    if (!routesLibrary || !geometryLibrary || !map || !destination || !userLocation) {
+      if (polylineRef.current) polylineRef.current.setMap(null);
       return;
     }
 
-    directionsService.route({
-      origin: userLocation,
+    const service = new routesLibrary.DirectionsService();
+    
+    // Check if user is too far from stadium (e.g. testing from home)
+    // If > 10km, use a mock starting point for the demo
+    const distanceToStadium = geometryLibrary.spherical.computeDistanceBetween(
+      userLocation,
+      STADIUM_CENTER
+    );
+
+    const actualOrigin = distanceToStadium > 10000 
+      ? { lat: STADIUM_CENTER.lat + 0.005, lng: STADIUM_CENTER.lng + 0.005 }
+      : userLocation;
+
+    service.route({
+      origin: actualOrigin,
       destination: destination,
       travelMode: google.maps.TravelMode.WALKING,
     }, (result, status) => {
-      if (status === google.maps.DirectionsStatus.OK) {
-        directionsRenderer.setDirections(result);
+      if (status === 'OK' && result && result.routes[0]) {
+        setRoute(result.routes[0]);
+        if (polylineRef.current) polylineRef.current.setMap(null);
+        polylineRef.current = new google.maps.Polyline({
+          path: result.routes[0].overview_path,
+          geodesic: true,
+          strokeColor: '#3b82f6',
+          strokeOpacity: 0.9,
+          strokeWeight: 8,
+          map: map
+        });
+      } else {
+        console.warn("Directions request returned no results or failed:", status);
       }
     });
-  }, [directionsService, directionsRenderer, destination, userLocation]);
+
+    return () => {
+      if (polylineRef.current) polylineRef.current.setMap(null);
+    };
+  }, [routesLibrary, geometryLibrary, map, destination, userLocation]);
 
   return null;
 };
 
 interface SectorOverlayProps {
+  key?: string;
   sector: { id: string; paths: google.maps.LatLngLiteral[] };
   density: number;
   waitTime: number;
@@ -128,16 +153,29 @@ const SectorOverlay = ({ sector, density, waitTime, onNavigate }: SectorOverlayP
   );
 };
 
-function VenueMap({ onToggleAR }: { onToggleAR: () => void }) {
+function VenueMap({ 
+  onToggleAR, 
+  userLocation: externalLocation,
+  isSimulating = false
+}: { 
+  onToggleAR: () => void; 
+  userLocation?: google.maps.LatLngLiteral | null;
+  isSimulating?: boolean;
+}) {
   const handleNavigate = useCallback((pos: google.maps.LatLngLiteral) => setNavDestination(pos), []);
-  const [userLocation, setUserLocation] = useState<google.maps.LatLngLiteral | null>(null);
+  const [internalLocation, setInternalLocation] = useState<google.maps.LatLngLiteral | null>(null);
   const [navDestination, setNavDestination] = useState<google.maps.LatLngLiteral | null>(null);
   const [sectorData, setSectorData] = useState<Record<string, { density: number; waitTime: number }>>({});
+  const [mapReady, setMapReady] = useState(false);
+  const geometryLibrary = useMapsLibrary('geometry');
+
+  // Use external location if provided, otherwise internal geolocation
+  const userLocation = externalLocation || internalLocation;
 
   useEffect(() => {
-    if (navigator.geolocation) {
+    if (!externalLocation && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position) => {
-        setUserLocation({
+        setInternalLocation({
           lat: position.coords.latitude,
           lng: position.coords.longitude
         });
@@ -150,7 +188,7 @@ function VenueMap({ onToggleAR }: { onToggleAR: () => void }) {
         const q = doc.data();
         if (q.sectorId) {
           data[q.sectorId] = {
-            density: Math.floor(Math.random() * 100),
+            density: q.density || Math.floor(Math.random() * 100),
             waitTime: q.waitTime || 0
           };
         }
@@ -159,26 +197,28 @@ function VenueMap({ onToggleAR }: { onToggleAR: () => void }) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [externalLocation]);
 
   return (
     <div className="h-full w-full relative">
-      <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''}>
         <Map
           style={{ width: '100%', height: '100%' }}
           defaultCenter={STADIUM_CENTER}
+          center={isSimulating && userLocation ? userLocation : undefined}
           defaultZoom={17}
           gestureHandling={'greedy'}
           disableDefaultUI={true}
-          mapId="VENUE_FLOW_MAP"
+          mapId={null}
+          onIdle={() => setMapReady(true)}
         >
-          {userLocation && (
-            <AdvancedMarker position={userLocation}>
-              <div className="h-4 w-4 rounded-full bg-blue-500 border-2 border-white shadow-lg animate-pulse" />
-            </AdvancedMarker>
+          {mapReady && userLocation && (
+            <Marker 
+              key={`${userLocation.lat}-${userLocation.lng}`} 
+              position={userLocation} 
+            />
           )}
 
-          {SECTOR_COORDS.map(s => (
+          {mapReady && SECTOR_COORDS.map(s => (
             <SectorOverlay 
               key={s.id} 
               sector={s} 
@@ -188,7 +228,7 @@ function VenueMap({ onToggleAR }: { onToggleAR: () => void }) {
             />
           ))}
 
-          <Directions destination={navDestination} userLocation={userLocation} />
+          {mapReady && <Directions destination={navDestination} userLocation={userLocation} />}
         </Map>
 
         <div className="absolute top-4 left-4 flex flex-col gap-2">
@@ -208,7 +248,6 @@ function VenueMap({ onToggleAR }: { onToggleAR: () => void }) {
             </Button>
           )}
         </div>
-      </APIProvider>
     </div>
   );
 }

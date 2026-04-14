@@ -6,7 +6,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 admin.initializeApp();
 const bq = new BigQuery();
 
-const PROJECT_ID = process.env.GCLOUD_PROJECT || 'gen-lang-client-0460255563';
+const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.FB_PROJECT_ID || 'venue-flow-default';
 const DATASET_ID = 'venueflow_analytics';
 
 export const getBigQueryAnalytics = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {

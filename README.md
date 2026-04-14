@@ -35,6 +35,11 @@ At massive events (80k+ people), **seconds matter**. Sudden surges at gates or f
 - **📊 BigQuery Visualizer**: High-fidelity charts streaming directly from Firestore changelogs.
 - **⏱️ Efficiency Tracker**: Monitor wait-time reduction and staff response speed.
 
+### 🎮 Demonstration & Simulation
+- **🔄 Live Motion Simulation**: Built-in "Demo Mode" that simulates real-time attendee movement around the venue—perfect for remote showcases.
+- **🌐 Global Sync Engine**: Orchestrates a unified state across Attendee, Staff, and Admin views, ensuring all analytics match the live map status instantly.
+- **🔌 Zero-Config Fallbacks**: Integrated mock-data streaming allows for a full feature demonstration even when offline or in limited connectivity environments.
+
 ---
 
 ## 🏗️ Technical Architecture

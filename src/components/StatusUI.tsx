@@ -23,9 +23,9 @@ export const SkeletonHeatmap = () => (
 );
 
 export const SkeletonList = () => (
-  <div className="space-y-3">
+  <div className="flex gap-2 overflow-x-auto no-scrollbar">
     {[...Array(5)].map((_, i) => (
-      <div key={i} className="h-20 rounded-lg border border-zinc-800 bg-zinc-900/50 animate-pulse" />
+      <div key={i} className="min-w-[160px] h-24 rounded-lg border border-zinc-800 bg-zinc-900/50 animate-pulse" />
     ))}
   </div>
 );

@@ -10,7 +10,7 @@ vi.mock('@/lib/gemini', () => ({
   getCrowdPrediction: vi.fn()
 }));
 
-vi.mock('@/AuthProvider', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ profile: { role: 'staff' } })
 }));
 

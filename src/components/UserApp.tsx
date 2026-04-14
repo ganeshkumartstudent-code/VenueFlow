@@ -6,12 +6,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Camera, MapPin, Navigation, MessageCircle, Send, Users, Clock, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { askGemini, geminiModel } from '@/lib/gemini';
+import { askGemini } from '@/lib/gemini';
 import { db, collection, onSnapshot, query, orderBy, limit } from '@/lib/firebase';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { SkeletonList, EmptyState } from './StatusUI';
 import { SearchX, MessageSquareOff } from 'lucide-react';
 import VenueMap from './VenueMap';
+import { GLOBAL_DEMO_DATA } from '@/lib/mockData';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -26,9 +27,31 @@ export default function UserApp() {
   const [queues, setQueues] = useState<any[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulatedLocation, setSimulatedLocation] = useState<google.maps.LatLngLiteral | null>(null);
   // FIX: ref for focus management — move focus into chat when mode changes
   const chatInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Simulation Logic: Move the user in a circle near the stadium for the demo
+  useEffect(() => {
+    let interval: any;
+    if (isSimulating) {
+      let angle = 0;
+      interval = setInterval(() => {
+        const radius = 0.005; // ~500m
+        const center = { lat: 33.9535, lng: -118.3392 };
+        setSimulatedLocation({
+          lat: center.lat + Math.cos(angle) * radius,
+          lng: center.lng + Math.sin(angle) * radius
+        });
+        angle += 0.05;
+      }, 1000);
+    } else {
+      setSimulatedLocation(null);
+    }
+    return () => clearInterval(interval);
+  }, [isSimulating]);
 
   const speakText = async (text: string) => {
     setIsSpeaking(true);
@@ -58,12 +81,32 @@ export default function UserApp() {
     }
   };
 
+  const [queuesLoading, setQueuesLoading] = useState(true);
+
   useEffect(() => {
-    const q = query(collection(db, 'queues'), orderBy('waitTime', 'asc'), limit(5));
+    const q = query(collection(db, 'queues'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setQueues(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      let allQueues = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // FALLBACK: If Firestore is empty, use global demo data
+      if (allQueues.length === 0) {
+        allQueues = (GLOBAL_DEMO_DATA.queues || []) as any[];
+      }
+
+      // Sort manually in JS to avoid index requirement
+      const sorted = (allQueues as any[]).sort((a: any, b: any) => (a.waitTime || 0) - (b.waitTime || 0)).slice(0, 5);
+      setQueues(sorted);
+      setQueuesLoading(false);
+    }, (error) => {
+      console.error("Queues fetch error:", error);
+      setQueuesLoading(false);
     });
-    return () => unsubscribe();
+    
+    const timeout = setTimeout(() => setQueuesLoading(false), 5000);
+    return () => {
+      unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   // FIX: Move focus into chat input when chat mode is activated
@@ -83,13 +126,21 @@ export default function UserApp() {
     setMessages(prev => [...prev, { role: 'ai' as const, text: aiResponse }]);
   };
 
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
   const startAR = async () => {
     setMode('ar');
+    setCameraError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       if (videoRef.current) videoRef.current.srcObject = stream;
-    } catch (err) {
+    } catch (err: any) {
       console.error("Camera error:", err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setCameraError("Camera access was denied. Please enable permissions in your browser settings to use AR navigation.");
+      } else {
+        setCameraError("Could not access camera. Please ensure no other app is using it.");
+      }
     }
   };
 
@@ -110,48 +161,31 @@ export default function UserApp() {
         Skip to main content
       </a>
 
-      {/* Top Stats Bar */}
-      {/* FIX: role="status" region so screen readers understand it as live data */}
-      <div
-        className="grid grid-cols-2 gap-2 md:grid-cols-4"
-        role="region"
-        aria-label="Live venue statistics"
-      >
-        <Card className="border-zinc-800 bg-zinc-900/50 p-3">
-          <div className="flex items-center gap-2 text-zinc-400">
-            {/* FIX: aria-hidden on decorative icon */}
-            <Users className="h-4 w-4" aria-hidden="true" />
-            <span className="text-xs uppercase tracking-wider" id="density-label">Venue Density</span>
-          </div>
-          {/* FIX: aria-labelledby ties the value to the label */}
-          <p
-            className="mt-1 text-xl font-bold text-orange-500"
-            aria-labelledby="density-label"
-            aria-live="polite"
-          >
-            64%
-          </p>
+      {/* Dynamic Header Metrics */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card className="border-zinc-800 bg-zinc-900/50 backdrop-blur-md">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="h-4 w-4 text-orange-500" aria-hidden="true" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Venue Density</span>
+            </div>
+            <div className="text-2xl font-bold text-orange-500">64%</div>
+          </CardContent>
         </Card>
-        <Card className="border-zinc-800 bg-zinc-900/50 p-3">
-          <div className="flex items-center gap-2 text-zinc-400">
-            {/* FIX: aria-hidden on decorative icon */}
-            <Clock className="h-4 w-4" aria-hidden="true" />
-            <span className="text-xs uppercase tracking-wider" id="wait-label">Avg. Wait</span>
-          </div>
-          <p
-            className="mt-1 text-xl font-bold text-orange-500"
-            aria-labelledby="wait-label"
-            aria-live="polite"
-          >
-            8 min
-          </p>
+        <Card className="border-zinc-800 bg-zinc-900/50 backdrop-blur-md">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="h-4 w-4 text-orange-500" aria-hidden="true" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Avg. Wait</span>
+            </div>
+            <div className="text-2xl font-bold text-orange-500">8 min</div>
+          </CardContent>
         </Card>
       </div>
 
-      {/* Main View Area */}
       <div
         id="main-content"
-        className="relative flex-1 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-inner"
+        className="relative flex-[3] min-h-[300px] overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-inner"
       >
         <AnimatePresence mode="wait">
           {mode === 'map' && (
@@ -160,7 +194,23 @@ export default function UserApp() {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="h-full w-full"
             >
-              <VenueMap onToggleAR={startAR} />
+              <VenueMap 
+                onToggleAR={startAR} 
+                userLocation={simulatedLocation} 
+                isSimulating={isSimulating}
+              />
+              
+              {/* Simulation Controls Overlay */}
+              <div className="absolute top-20 left-4 z-10 flex flex-col gap-2">
+                <Button 
+                  size="sm"
+                  variant={isSimulating ? "destructive" : "secondary"}
+                  className="h-8 text-[10px] font-bold uppercase tracking-tighter"
+                  onClick={() => setIsSimulating(!isSimulating)}
+                >
+                  {isSimulating ? "Stop Simulation" : "Simulate Live Demo"}
+                </Button>
+              </div>
             </motion.div>
           )}
 
@@ -183,16 +233,27 @@ export default function UserApp() {
                 title="Live camera feed for AR navigation"
                 aria-label="Camera viewfinder for augmented reality navigation"
               />
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" aria-hidden="true">
-                <div className="w-64 h-64 border-2 border-dashed border-orange-500/50 rounded-full animate-pulse flex items-center justify-center">
-                  <div className="text-center">
-                    <Navigation className="h-12 w-12 text-orange-500 mx-auto mb-2" aria-hidden="true" />
-                    <p className="text-orange-500 font-bold text-xl">Sector 4</p>
-                    <p className="text-white text-sm">Follow the path</p>
+              {cameraError ? (
+                <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
+                  <div className="max-w-xs space-y-4">
+                    <AlertTriangle className="h-12 w-12 text-red-500 mx-auto" />
+                    <p className="text-white text-sm">{cameraError}</p>
+                    <Button variant="outline" onClick={() => setMode('map')}>
+                      Return to Map
+                    </Button>
                   </div>
                 </div>
-                {/* FIX: AR suggestion panel is role="alert" to announce to AT even though pointer-events-none */}
-              </div>
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" aria-hidden="true">
+                  <div className="w-64 h-64 border-2 border-dashed border-orange-500/50 rounded-full animate-pulse flex items-center justify-center">
+                    <div className="text-center">
+                      <Navigation className="h-12 w-12 text-orange-500 mx-auto mb-2" aria-hidden="true" />
+                      <p className="text-orange-500 font-bold text-xl">Sector 4</p>
+                      <p className="text-white text-sm">Follow the path</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* FIX: Moved AI suggestion outside pointer-events-none container so AT can reach it */}
               <div
@@ -333,43 +394,36 @@ export default function UserApp() {
         <h2 id="queues-heading" className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">
           Recommended Queues
         </h2>
-        {/* FIX: scrollable list with role="list" for AT; overflow peers use tabIndex for KB */}
-        <div
+        <div 
           className="flex gap-2 overflow-x-auto pb-2 no-scrollbar"
           role="list"
-          aria-label="Recommended queues sorted by shortest wait time"
+          aria-labelledby="queues-heading"
         >
-          {queues.length > 0 ? queues.map(q => (
-            <Card
-              key={q.id}
-              role="listitem"
-              className="min-w-[160px] border-zinc-800 bg-zinc-900/50 p-3"
-              aria-label={`${q.id}, ${q.type} at ${q.sectorId}, ${q.waitTime} minute wait`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <Badge variant="secondary" className="text-[10px] uppercase">{q.type}</Badge>
-                <span className="text-[10px] text-zinc-500" aria-label={`Sector ${q.sectorId}`}>{q.sectorId}</span>
-              </div>
-              <p className="text-sm font-semibold truncate">{q.id}</p>
-              <div className="mt-2 flex items-center justify-between">
-                <div className="flex items-center gap-1 text-orange-500">
-                  <Clock className="h-3 w-3" aria-hidden="true" />
-                  <span className="text-xs font-bold" aria-label={`${q.waitTime} minute wait`}>{q.waitTime}m</span>
-                </div>
-                <div
-                  className="h-1 w-12 bg-zinc-800 rounded-full overflow-hidden"
-                  role="meter"
-                  aria-valuenow={Math.max(0, 100 - q.waitTime * 5)}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label={`Queue availability: ${Math.max(0, 100 - q.waitTime * 5)}%`}
-                >
-                  <div className="h-full bg-green-500" style={{ width: `${Math.max(0, 100 - q.waitTime * 5)}%` }} />
-                </div>
-              </div>
-            </Card>
-          )) : (
+          {queues.length > 0 ? (
+            queues.map(q => (
+              <Card 
+                key={q.id} 
+                role="listitem"
+                className="min-w-[160px] flex-shrink-0 bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 transition-colors"
+              >
+                <CardContent className="p-3">
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="text-[10px] font-bold text-zinc-500 uppercase">Sector {q.sectorId}</span>
+                    <Badge variant={q.density > 80 ? "destructive" : "secondary"} className="text-[8px] h-3 px-1">
+                      {q.density > 80 ? 'CRITICAL' : 'STABLE'}
+                    </Badge>
+                  </div>
+                  <div className="text-lg font-bold text-white mb-0.5">{q.waitTime}m</div>
+                  <p className="text-[9px] text-zinc-500">Predicted wait time</p>
+                </CardContent>
+              </Card>
+            ))
+          ) : queuesLoading ? (
             <SkeletonList />
+          ) : (
+            <div className="w-full py-4 text-center border border-dashed border-zinc-800 rounded-lg text-zinc-500 text-xs text-zinc-600">
+              No active queues found at this location.
+            </div>
           )}
         </div>
       </section>

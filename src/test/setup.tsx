@@ -80,6 +80,19 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: vi.fn(() => 'mock-timestamp'),
 }));
 
+vi.mock('firebase/functions', () => ({
+  getFunctions: vi.fn(),
+  httpsCallable: vi.fn(() => vi.fn(async (data) => {
+    const mock = (globalThis as any).geminiMock;
+    // Map the Cloud Function call to the geminiMock for compatibility with existing tests
+    const response = await mock.generateContent({
+      contents: data.prompt,
+      config: { ...data.config, systemInstruction: data.systemInstruction }
+    });
+    return { data: { text: response.text } };
+  })),
+}));
+
 // Mock motion/react
 vi.mock('motion/react', () => ({
   motion: {

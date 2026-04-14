@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { functions, httpsCallable } from '@/lib/firebase';
 import { toast } from 'sonner';
 import { SkeletonChart } from './StatusUI';
+import { GLOBAL_DEMO_DATA } from '@/lib/mockData';
 
 function AdminAnalytics() {
   const [loading, setLoading] = useState(true);
@@ -23,7 +24,6 @@ function AdminAnalytics() {
     setLoading(true);
     try {
       const getBigQueryAnalytics = httpsCallable(functions, 'getBigQueryAnalytics');
-      // Limit results on the backend or pass a parameter
       const result = await getBigQueryAnalytics({ limit: 100 });
       const analytics = result.data as any;
       
@@ -34,8 +34,22 @@ function AdminAnalytics() {
       });
       toast.success("BigQuery Analytics Synced");
     } catch (error) {
-      console.error("Analytics fetch error:", error);
-      toast.error("Failed to connect to BigQuery");
+      console.warn("Analytics fetch error, falling back to mock data:", error);
+      // Mock Fallback for Demo - USING GLOBAL SYNC DATA
+      setData({
+        waitTime: GLOBAL_DEMO_DATA.sectors.map(s => ({
+          sectorId: s.id,
+          avgWait: s.waitTime,
+          wait: s.waitTime
+        })),
+        density: GLOBAL_DEMO_DATA.sectors.map(s => ({
+          sectorId: s.id,
+          peakDensity: s.density,
+          density: s.density
+        })),
+        efficiency: { rate: 0.78, completed: 42, total: 54 }
+      });
+      toast.info("Offline Mode: Using simulated streaming data");
     } finally {
       setLoading(false);
     }
@@ -159,7 +173,7 @@ function AdminAnalytics() {
                   <SkeletonChart />
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data.waitTime}>
+                    <AreaChart data={waitTimeData}>
                       <defs>
                         <linearGradient id="colorWait" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
@@ -192,7 +206,7 @@ function AdminAnalytics() {
                   <SkeletonChart />
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data.density}>
+                    <BarChart data={densityData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
                       <XAxis dataKey="name" stroke="#71717a" fontSize={10} />
                       <YAxis stroke="#71717a" fontSize={10} />

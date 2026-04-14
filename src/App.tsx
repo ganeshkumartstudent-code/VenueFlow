@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AuthProvider, useAuth } from './AuthProvider';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { signInWithPopup, googleProvider, auth, signOut } from './lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +8,7 @@ import { LayoutDashboard, Map, Users, BarChart3, LogOut, MessageSquare, ShieldAl
 import { Toaster } from '@/components/ui/sonner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OfflineBanner } from './components/StatusUI';
+import { APIProvider } from '@vis.gl/react-google-maps';
 
 const UserApp = React.lazy(() => import('./components/UserApp'));
 const StaffDashboard = React.lazy(() => import('./components/StaffDashboard'));
@@ -20,7 +21,7 @@ const LoadingFallback = () => (
 );
 
 function AppContent() {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, loginAsGuest } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
 
   if (loading) {
@@ -68,9 +69,9 @@ function AppContent() {
               FIX: CardTitle outputs an h3 by default via shadcn; override to h1
               since this is the primary page heading on the sign-in screen.
             */}
-            <CardTitle className="text-3xl font-bold tracking-tight" as="h1">
+            <h1 className="text-3xl font-bold tracking-tight text-white mb-2">
               VenueFlow AI
-            </CardTitle>
+            </h1>
             {/*
               CONTRAST: text-zinc-400 (#a1a1aa) on bg-zinc-900 (#18181b) → 6.89:1 ✓ AA
             */}
@@ -88,11 +89,39 @@ function AppContent() {
               Optimize your event experience with real-time AI navigation and crowd insights.
             </p>
             <Button
-              onClick={() => signInWithPopup(auth, googleProvider)}
+              onClick={async () => {
+                try {
+                  await signInWithPopup(auth, googleProvider);
+                } catch (error: any) {
+                  console.error("Sign-in failed:", error);
+                  if (error.code === 'auth/popup-blocked') {
+                    console.warn("Popup blocked by browser. Please enable popups or use Guest Mode.");
+                  } else if (error.message?.includes('Cross-Origin-Opener-Policy')) {
+                    console.warn("COOP Policy blocked the popup. Entering guest mode is recommended for local development.");
+                  }
+                }
+              }}
               className="h-12 w-full bg-orange-600 font-semibold text-white hover:bg-orange-700 focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
               aria-label="Sign in to VenueFlow AI using your Google account"
             >
               Sign in with Google
+            </Button>
+            
+            <div className="relative my-2">
+              <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                <span className="w-full border-t border-zinc-800"></span>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-zinc-900 px-2 text-zinc-500">Or development fallback</span>
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={() => loginAsGuest()}
+              className="border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-white"
+            >
+              Continue as Guest (Dev)
             </Button>
           </CardContent>
         </Card>
@@ -230,7 +259,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppContent />
+        <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY || ''}>
+          <AppContent />
+        </APIProvider>
       </AuthProvider>
     </ErrorBoundary>
   );
