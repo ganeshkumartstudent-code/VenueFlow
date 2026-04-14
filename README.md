@@ -130,4 +130,4 @@ By optimizing movement, we reduce idle time (and associated carbon footprint) an
 
 ---
 
-**Built with ❤️ for Global Solution Challenge 2025**
+**Built with ❤️ for Global Solution Challenge 2026**
