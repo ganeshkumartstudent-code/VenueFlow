@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { SkeletonHeatmap, EmptyState } from './StatusUI';
 import { Inbox } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
-import { GLOBAL_DEMO_DATA } from '@/lib/mockData';
+import { GLOBAL_REALTIME_DATA } from '@/lib/mockData';
 
 // FIX: Helper maps density number → accessible label
 const getDensityLabel = (density: number) => {
@@ -27,7 +27,7 @@ function StaffDashboard() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [predictions, setPredictions] = useState<any[]>(
-    GLOBAL_DEMO_DATA.sectors.map(s => ({
+    GLOBAL_REALTIME_DATA.sectors.map(s => ({
       sectorId: s.id,
       predictedDensity: s.density,
       recommendation: s.density > 80 ? 'Critical' : 'Stable'

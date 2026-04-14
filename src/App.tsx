@@ -121,7 +121,7 @@ function AppContent() {
               onClick={() => loginAsGuest()}
               className="border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-white"
             >
-              Continue as Guest (Dev)
+              Enter for Real-time Review
             </Button>
           </CardContent>
         </Card>

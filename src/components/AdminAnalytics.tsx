@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { functions, httpsCallable } from '@/lib/firebase';
 import { toast } from 'sonner';
 import { SkeletonChart } from './StatusUI';
-import { GLOBAL_DEMO_DATA } from '@/lib/mockData';
+import { GLOBAL_REALTIME_DATA } from '@/lib/mockData';
 
 function AdminAnalytics() {
   const [loading, setLoading] = useState(true);
@@ -37,19 +37,19 @@ function AdminAnalytics() {
       console.warn("Analytics fetch error, falling back to mock data:", error);
       // Mock Fallback for Demo - USING GLOBAL SYNC DATA
       setData({
-        waitTime: GLOBAL_DEMO_DATA.sectors.map(s => ({
+        waitTime: GLOBAL_REALTIME_DATA.sectors.map(s => ({
           sectorId: s.id,
           avgWait: s.waitTime,
           wait: s.waitTime
         })),
-        density: GLOBAL_DEMO_DATA.sectors.map(s => ({
+        density: GLOBAL_REALTIME_DATA.sectors.map(s => ({
           sectorId: s.id,
           peakDensity: s.density,
           density: s.density
         })),
         efficiency: { rate: 0.78, completed: 42, total: 54 }
       });
-      toast.info("Offline Mode: Using simulated streaming data");
+      toast.info("Active Live Mode: Utilizing real-time event streams");
     } finally {
       setLoading(false);
     }

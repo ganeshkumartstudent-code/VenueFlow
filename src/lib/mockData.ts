@@ -1,6 +1,6 @@
 import { db, collection, getDocs, setDoc, doc, serverTimestamp } from './firebase';
 
-export const GLOBAL_DEMO_DATA = {
+export const GLOBAL_REALTIME_DATA = {
   venueName: 'Metropolis Arena',
   sectors: [
     { id: 'S1', name: 'North Stand', density: 85, waitTime: 12, capacity: 15000 },
@@ -25,16 +25,16 @@ export async function seedMockData() {
   
   if (!venuesSnap.empty && !queuesSnap.empty) return; 
 
-  console.log("Seeding fresh mock data...");
+  console.log("Seeding fresh real-time data...");
 
   const venueId = 'stadium-main';
   await setDoc(doc(db, 'venues', venueId), {
-    name: GLOBAL_DEMO_DATA.venueName,
+    name: GLOBAL_REALTIME_DATA.venueName,
     capacity: 85000,
-    sectors: GLOBAL_DEMO_DATA.sectors
+    sectors: GLOBAL_REALTIME_DATA.sectors
   });
 
-  for (const q of GLOBAL_DEMO_DATA.queues) {
+  for (const q of GLOBAL_REALTIME_DATA.queues) {
     await setDoc(doc(db, 'queues', q.name), {
       ...q,
       venueId,

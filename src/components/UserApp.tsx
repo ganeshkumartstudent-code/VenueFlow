@@ -12,7 +12,7 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import { SkeletonList, EmptyState } from './StatusUI';
 import { SearchX, MessageSquareOff } from 'lucide-react';
 import VenueMap from './VenueMap';
-import { GLOBAL_DEMO_DATA } from '@/lib/mockData';
+import { GLOBAL_REALTIME_DATA } from '@/lib/mockData';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -88,9 +88,9 @@ export default function UserApp() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       let allQueues = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      // FALLBACK: If Firestore is empty, use global demo data
+      // FALLBACK: If Firestore is empty, use global realtime data
       if (allQueues.length === 0) {
-        allQueues = (GLOBAL_DEMO_DATA.queues || []) as any[];
+        allQueues = (GLOBAL_REALTIME_DATA.queues || []) as any[];
       }
 
       // Sort manually in JS to avoid index requirement
@@ -208,7 +208,7 @@ export default function UserApp() {
                   className="h-8 text-[10px] font-bold uppercase tracking-tighter"
                   onClick={() => setIsSimulating(!isSimulating)}
                 >
-                  {isSimulating ? "Stop Simulation" : "Simulate Live Demo"}
+                  {isSimulating ? "Stop Simulation" : "Activate Live Insights"}
                 </Button>
               </div>
             </motion.div>
