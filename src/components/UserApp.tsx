@@ -37,7 +37,7 @@ export default function UserApp() {
 
   // Simulation Logic: Move the user in a circle near the stadium
   useEffect(() => {
-    let interval: any;
+    let interval: NodeJS.Timeout;
     if (isSimulating) {
       let angle = 0;
       interval = setInterval(() => {
@@ -49,10 +49,10 @@ export default function UserApp() {
         });
         angle += 0.05;
       }, 1000);
-    } else {
-      setSimulatedLocation(null);
-    }
-    return () => clearInterval(interval);
+    } 
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [isSimulating]);
 
   const speakText = async (text: string) => {

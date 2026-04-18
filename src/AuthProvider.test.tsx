@@ -80,7 +80,7 @@ describe('AuthProvider', () => {
   });
 
   it('should handle unauthenticated state', async () => {
-    (onAuthStateChanged as any).mockImplementation((auth, callback) => {
+    (onAuthStateChanged as any).mockImplementation((auth: any, callback: any) => {
       callback(null);
       return () => {};
     });
@@ -95,5 +95,28 @@ describe('AuthProvider', () => {
     
     expect(screen.getByTestId('user-email')).toHaveTextContent('no-user');
     expect(screen.getByTestId('profile-role')).toHaveTextContent('no-role');
+  });
+
+  it('should fallback to guest mode if auth times out', async () => {
+    vi.useFakeTimers();
+    
+    (onAuthStateChanged as any).mockImplementation(() => {
+      return () => {};
+    });
+
+    render(
+      <AuthProvider>
+        <TestComponent />
+      </AuthProvider>
+    );
+
+    vi.advanceTimersByTime(2100);
+
+    await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
+    
+    expect(screen.getByTestId('user-email')).toHaveTextContent('guest@example.com');
+    expect(screen.getByTestId('profile-role')).toHaveTextContent('attendee');
+
+    vi.useRealTimers();
   });
 });

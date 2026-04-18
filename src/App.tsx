@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { signInWithPopup, googleProvider, auth, signOut } from './lib/firebase';
+import { auth, signOut } from './lib/firebase';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LayoutDashboard, Map, Users, BarChart3, LogOut, MessageSquare, ShieldAlert } from 'lucide-react';
+import { Map, Users, BarChart3, LogOut, ShieldAlert } from 'lucide-react';
 import { Toaster } from '@/components/ui/sonner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OfflineBanner } from './components/StatusUI';
+import { LoginScreen } from './components/LoginScreen';
 import { APIProvider } from '@vis.gl/react-google-maps';
 
 const UserApp = React.lazy(() => import('./components/UserApp'));
@@ -57,86 +57,7 @@ function AppContent() {
   }
 
   if (!user) {
-    return (
-      /*
-        FIX: Sign-in page should be a <main> landmark with a region label.
-        The Map icon is decorative — aria-hidden="true".
-        The sign-in button has a clear, descriptive label.
-      */
-      <main
-        className="flex h-screen items-center justify-center bg-zinc-950 p-4"
-        aria-label="Sign in to VenueFlow AI"
-      >
-        <Card className="w-full max-w-md border-zinc-800 bg-zinc-900 text-white shadow-2xl">
-          <CardHeader className="space-y-1 text-center">
-            <div className="mb-4 flex justify-center" aria-hidden="true">
-              <div className="rounded-full bg-orange-500/10 p-4 ring-1 ring-orange-500/20">
-                {/* FIX: decorative Map icon — aria-hidden */}
-                <Map className="h-8 w-8 text-orange-500" aria-hidden="true" />
-              </div>
-            </div>
-            {/*
-              FIX: CardTitle outputs an h3 by default via shadcn; override to h1
-              since this is the primary page heading on the sign-in screen.
-            */}
-            <h1 className="text-3xl font-bold tracking-tight text-white mb-2">
-              VenueFlow AI
-            </h1>
-            {/*
-              CONTRAST: text-zinc-400 (#a1a1aa) on bg-zinc-900 (#18181b) → 6.89:1 ✓ AA
-            */}
-            <CardDescription className="text-zinc-400">
-              Transforming Venue Congestion into Fluid Experiences
-            </CardDescription>
-
-          </CardHeader>
-
-          <CardContent className="grid gap-4">
-            {/*
-              CONTRAST: text-zinc-500 (#71717a) on bg-zinc-900 (#18181b) → 4.60:1 ✓ AA
-            */}
-            <p className="text-center text-sm text-zinc-500">
-              Optimize your event experience with real-time AI navigation and crowd insights.
-            </p>
-            <Button
-              onClick={async () => {
-                try {
-                  await signInWithPopup(auth, googleProvider);
-                } catch (error: any) {
-                  console.error("Sign-in failed:", error);
-                  if (error.code === 'auth/popup-blocked') {
-                    console.warn("Popup blocked by browser. Please enable popups or use Guest Mode.");
-                  } else if (error.message?.includes('Cross-Origin-Opener-Policy')) {
-                    console.warn("COOP Policy blocked the popup. Entering guest mode is recommended for local development.");
-                  }
-                }
-              }}
-              className="h-12 w-full bg-orange-600 font-semibold text-white hover:bg-orange-700 focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
-              aria-label="Sign in to VenueFlow AI using your Google account"
-            >
-              Sign in with Google
-            </Button>
-            
-            <div className="relative my-2">
-              <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                <span className="w-full border-t border-zinc-800"></span>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-zinc-900 px-2 text-zinc-500">Or development fallback</span>
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              onClick={() => loginAsGuest()}
-              className="border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-white"
-            >
-              Enter for Real-time Review
-            </Button>
-          </CardContent>
-        </Card>
-      </main>
-    );
+    return <LoginScreen loginAsGuest={loginAsGuest} />;
   }
 
   return (

@@ -26,7 +26,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email: 'guest@example.com',
       displayName: 'Guest User',
       isAnonymous: true,
-    } as any);
+      emailVerified: true,
+      phoneNumber: null,
+      photoURL: null,
+      metadata: {},
+      providerData: [],
+      refreshToken: '',
+      tenantId: null,
+      delete: async () => {},
+      getIdToken: async () => '',
+      getIdTokenResult: async () => ({} as any),
+      reload: async () => {},
+      toJSON: () => ({}),
+    } as FirebaseUser);
     setProfile({
       uid: 'guest',
       email: 'guest@example.com',

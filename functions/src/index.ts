@@ -103,3 +103,52 @@ export const callGemini = functions.https.onCall(async (data: { prompt: string }
     throw new functions.https.HttpsError('internal', 'AI generation failed.');
   }
 });
+
+/**
+ * AGENTIC TASKING: Background trigger to auto-generate staff tasks
+ * when sector density hits critical levels (>80%).
+ */
+export const onQueueUpdateAgentic = functions.firestore
+  .document('queues/{queueId}')
+  .onUpdate(async (change, context) => {
+    const newData = change.after.data();
+    const oldData = change.before.data();
+
+    // Only act if density just crossed the 80% threshold
+    if (newData.density >= 80 && oldData.density < 80) {
+      const sectorId = newData.sectorId || 'Unknown Sector';
+      const prompt = `
+        VENUE ANALYTICS ALERT: Sector ${sectorId} has reached ${newData.density}% density.
+        Wait time is currently ${newData.waitTime} minutes.
+        ACT AS: A senior stadium operations manager.
+        TASK: Generate a single, clear, high-priority staff instruction to mitigate this density surge.
+        RESPONSE FORMAT: Just the instruction text, max 15 words.
+      `;
+
+      const apiKey = functions.config().gemini.key;
+      if (!apiKey) return;
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+
+      try {
+        const result = await model.generateContent(prompt);
+        const taskText = result.response.text();
+
+        // Create the task in Firestore for staff to see
+        await admin.firestore().collection('tasks').add({
+          description: taskText,
+          location: sectorId,
+          priority: 'high',
+          status: 'pending',
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          generatedBy: 'VenueFlow-AI-Agent'
+        });
+
+        console.log(`Agentic Task Created for Sector ${sectorId}: ${taskText}`);
+      } catch (err) {
+        console.error("Agentic Task Generation Failed:", err);
+      }
+    }
+    return null;
+  });
