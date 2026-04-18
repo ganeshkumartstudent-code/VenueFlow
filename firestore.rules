@@ -9,15 +9,17 @@ service cloud.firestore {
 
     // Helper function to check user role
     function hasRole(role) {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+      return isAuth()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
 
     // USER PROFILES: Users can only read/write their own profiles
     match /users/{userId} {
-      allow read: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId 
+      allow read: if isAuth() && request.auth.uid == userId;
+      allow update: if isAuth() && request.auth.uid == userId 
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'uid', 'createdAt']);
-      allow create: if request.auth.uid == userId 
+      allow create: if isAuth() && request.auth.uid == userId 
         && request.resource.data.role == 'attendee'; // Default role for new users
     }
 

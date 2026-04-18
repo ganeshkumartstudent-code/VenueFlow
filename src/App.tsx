@@ -190,7 +190,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY || ''}>
+        <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
           <AppContent />
         </APIProvider>
       </AuthProvider>

@@ -1,12 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { askGemini, getCrowdPrediction } from './gemini';
 
 // Use the global mock created in setup.tsx
 const mockGenerateContent = (globalThis as any).geminiMock.generateContent;
+let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 describe('Gemini Service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
   });
 
   it('should send prompts to Gemini and return text responses', async () => {
@@ -52,7 +58,10 @@ describe('Gemini Service', () => {
       text: JSON.stringify(mockPrediction),
     });
 
-    const sensorData = { venueId: 'test' };
+    const sensorData = {
+      venueId: 'test',
+      currentDensity: [{ sectorId: 'S1', density: 70 }]
+    };
     const result = await getCrowdPrediction(sensorData);
 
     expect(mockGenerateContent).toHaveBeenCalledWith(expect.objectContaining({

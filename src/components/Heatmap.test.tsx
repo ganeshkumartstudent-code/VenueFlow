@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import StaffDashboard from './StaffDashboard';
-import React from 'react';
 
 // Mock Auth context
 vi.mock('@/contexts/AuthContext', () => ({
@@ -25,12 +24,12 @@ describe('Heatmap Component (in StaffDashboard)', () => {
     // Note: The component uses Math.random() for initial state if no predictions exist.
     // For testing, we can check if the rendered elements exist.
     // In a real scenario, we might want to dependency infect the density values.
-    
-    const { container } = render(<StaffDashboard />);
-    
+
+    render(<StaffDashboard />);
+
     // Check for the legend to ensure density logic is represented
-    expect(screen.getByText('Low')).toBeInTheDocument();
-    expect(screen.getByText('Moderate')).toBeInTheDocument();
-    expect(screen.getByText('Critical')).toBeInTheDocument();
+    expect(screen.getByText('Low (<50%)')).toBeInTheDocument();
+    expect(screen.getByText('Moderate (50–80%)')).toBeInTheDocument();
+    expect(screen.getByText('Critical (>80%)')).toBeInTheDocument();
   });
 });

@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Navigation, MessageCircle, Send, Users, Clock, AlertTriangle } from 'lucide-react';
+import { Navigation, Send, Users, Clock, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { askGemini } from '@/lib/gemini';
 import { GoogleGenAI, Modality } from "@google/genai";
@@ -13,7 +13,8 @@ import { MessageSquareOff } from 'lucide-react';
 import VenueMap from './VenueMap';
 import { useCrowdData } from '@/hooks/useCrowdData';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+const ttsApiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+const ai = ttsApiKey ? new GoogleGenAI({ apiKey: ttsApiKey }) : null;
 
 export default function UserApp() {
   const { queues, loading: queuesLoading } = useCrowdData();
@@ -51,6 +52,10 @@ export default function UserApp() {
   const speakText = async (text: string) => {
     setIsSpeaking(true);
     try {
+      if (!ai) {
+        throw new Error('VITE_GEMINI_API_KEY is missing for TTS.');
+      }
+
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
         contents: [{ parts: [{ text: `Say clearly: ${text}` }] }],
@@ -110,13 +115,6 @@ export default function UserApp() {
         setCameraError("Could not access camera. Please ensure no other app is using it.");
       }
     }
-  };
-
-  // FIX: Compute density label for sector colour-blind accessibility
-  const getSectorStatus = (index: number) => {
-    if (index === 4) return { label: 'Low density', colorClass: 'bg-green-500' };
-    if (index === 2) return { label: 'High density', colorClass: 'bg-red-500' };
-    return { label: 'Moderate density', colorClass: 'bg-yellow-500' };
   };
 
   return (

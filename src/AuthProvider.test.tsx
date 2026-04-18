@@ -1,8 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getDoc, setDoc } from 'firebase/firestore';
+
+let consoleLogSpy: ReturnType<typeof vi.spyOn>;
+let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
 // Component to test the hook
 const TestComponent = () => {
@@ -19,6 +22,13 @@ const TestComponent = () => {
 describe('AuthProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleLogSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   it('should handle authenticated state and fetch profile', async () => {
@@ -96,8 +106,6 @@ describe('AuthProvider', () => {
   });
 
   it('should fallback to guest mode if auth times out', async () => {
-    vi.useFakeTimers();
-    
     vi.mocked(onAuthStateChanged).mockImplementation(() => {
       return () => {};
     });
@@ -108,13 +116,11 @@ describe('AuthProvider', () => {
       </AuthProvider>
     );
 
-    vi.advanceTimersByTime(2100);
+    await waitFor(
+      () => expect(screen.getByTestId('user-email')).toHaveTextContent('guest@example.com'),
+      { timeout: 3000 }
+    );
 
-    await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
-    
-    expect(screen.getByTestId('user-email')).toHaveTextContent('guest@example.com');
     expect(screen.getByTestId('profile-role')).toHaveTextContent('attendee');
-
-    vi.useRealTimers();
   });
 });

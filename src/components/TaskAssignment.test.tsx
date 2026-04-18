@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import StaffDashboard from './StaffDashboard';
 import { getCrowdPrediction } from '@/lib/gemini';
 import { addDoc } from 'firebase/firestore';
-import React from 'react';
 
 // Mock everything needed
 vi.mock('@/lib/gemini', () => ({
@@ -70,45 +69,67 @@ describe('Agentic Task Assignment Logic', () => {
 
   it('should mark a task as completed calling updateDoc', async () => {
     const { updateDoc } = await import('firebase/firestore');
-    
+
     // We need to trigger completeTask. 
     // Tasks are rendered from onSnapshot. Let's mock the snapshot.
     const { onSnapshot } = await import('firebase/firestore');
-    (onSnapshot as any).mockImplementation((query, callback) => {
-      callback({
-        docs: [
-          { 
-            id: 'task-123', 
-            data: () => ({ description: 'Test Task', status: 'pending', priority: 'high', location: 'S1' }) 
-          }
-        ]
-      });
+    (onSnapshot as any).mockImplementation((
+      queryRef: { path?: string },
+      callback: (snapshot: { empty?: boolean; docs: Array<{ id: string; data: () => Record<string, unknown> }> }) => void
+    ) => {
+      if (queryRef.path === 'tasks') {
+        callback({
+          empty: false,
+          docs: [
+            {
+              id: 'task-123',
+              data: () => ({ description: 'Test Task', status: 'pending', priority: 'high', location: 'S1' })
+            }
+          ]
+        });
+      } else if (queryRef.path === 'venues') {
+        callback({ empty: true, docs: [] });
+      } else {
+        callback({ empty: true, docs: [] });
+      }
       return () => {};
     });
 
     render(<StaffDashboard />);
-    
-    const completeButton = await screen.findByRole('button', { name: '' }); // The icon button
+
+    const completeButton = await screen.findByRole('button', { name: /Mark task complete: Test Task/i });
     fireEvent.click(completeButton);
 
-    expect(updateDoc).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ status: 'completed' })
-    );
+    await waitFor(() => {
+      expect(updateDoc).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ status: 'completed' })
+      );
+    });
   });
 
   it('should display task list correctly from Firestore', async () => {
     // Mock the snapshot for tasks
     const { onSnapshot } = await import('firebase/firestore');
-    (onSnapshot as any).mockImplementation((query, callback) => {
-      callback({
-        docs: [
-          { 
-            id: 'task-123', 
-            data: () => ({ description: 'Test Task x', status: 'pending', priority: 'high', location: 'S1' }) 
-          }
-        ]
-      });
+    (onSnapshot as any).mockImplementation((
+      queryRef: { path?: string },
+      callback: (snapshot: { empty?: boolean; docs: Array<{ id: string; data: () => Record<string, unknown> }> }) => void
+    ) => {
+      if (queryRef.path === 'tasks') {
+        callback({
+          empty: false,
+          docs: [
+            {
+              id: 'task-123',
+              data: () => ({ description: 'Test Task x', status: 'pending', priority: 'high', location: 'S1' })
+            }
+          ]
+        });
+      } else if (queryRef.path === 'venues') {
+        callback({ empty: true, docs: [] });
+      } else {
+        callback({ empty: true, docs: [] });
+      }
       return () => {};
     });
 

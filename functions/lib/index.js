@@ -33,17 +33,55 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.callGemini = exports.getBigQueryAnalytics = void 0;
+exports.onQueueUpdateAgentic = exports.callGemini = exports.getBigQueryAnalytics = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const bigquery_1 = require("@google-cloud/bigquery");
 const generative_ai_1 = require("@google/generative-ai");
 admin.initializeApp();
 const bq = new bigquery_1.BigQuery();
-const PROJECT_ID = process.env.GCLOUD_PROJECT || 'gen-lang-client-0460255563';
+const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.FB_PROJECT_ID || 'venue-flow-default';
 const DATASET_ID = 'venueflow_analytics';
-exports.getBigQueryAnalytics = functions.https.onCall(async (data, context) => {
-    // Check auth if needed: if (!context.auth) throw new functions.https.HttpsError('unauthenticated', '...');
+const PROMPT_MAX_LENGTH = 1000;
+const DISALLOWED_PROMPT_PATTERNS = [
+    /ignore previous instructions/i,
+    /system prompt/i,
+    /you are now a/i,
+    /forget everything/i,
+    /output the internal/i,
+    /reveal your secret/i,
+    /execute command/i,
+];
+function sanitizePrompt(rawPrompt) {
+    if (typeof rawPrompt !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', 'Prompt must be a string.');
+    }
+    const stripped = rawPrompt.replace(/<[^>]*>?/gm, '').trim();
+    if (!stripped) {
+        throw new functions.https.HttpsError('invalid-argument', 'Prompt cannot be empty.');
+    }
+    const boundedPrompt = stripped.slice(0, PROMPT_MAX_LENGTH);
+    if (DISALLOWED_PROMPT_PATTERNS.some((pattern) => pattern.test(boundedPrompt))) {
+        throw new functions.https.HttpsError('invalid-argument', 'Prompt rejected by security policy.');
+    }
+    return boundedPrompt;
+}
+async function getUserRole(uid) {
+    const userDoc = await admin.firestore().collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+        return null;
+    }
+    const role = userDoc.data()?.role;
+    return typeof role === 'string' ? role : null;
+}
+exports.getBigQueryAnalytics = functions.https.onCall(async (_data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be signed in.');
+    }
+    const userRole = await getUserRole(context.auth.uid);
+    if (userRole !== 'admin') {
+        throw new functions.https.HttpsError('permission-denied', 'Only admins can access analytics.');
+    }
     const queries = {
         // (a) Average wait time per sector over last 1 hour
         avgWaitTime: `
@@ -97,10 +135,14 @@ exports.callGemini = functions.https.onCall(async (data, context) => {
     const uid = context.auth.uid;
     const now = Date.now();
     const oneMinuteAgo = now - 60000;
+    const cleanPrompt = sanitizePrompt(data.prompt);
     // 2. Rate Limiting (Max 10 per minute)
     const rateLimitRef = admin.firestore().collection('rateLimits').doc(uid);
     const rateLimitDoc = await rateLimitRef.get();
-    const history = rateLimitDoc.exists ? (rateLimitDoc.data()?.timestamps || []) : [];
+    const rawHistory = rateLimitDoc.exists ? rateLimitDoc.data()?.timestamps : [];
+    const history = Array.isArray(rawHistory)
+        ? rawHistory.filter((ts) => typeof ts === 'number')
+        : [];
     const recentRequests = history.filter(ts => ts > oneMinuteAgo);
     if (recentRequests.length >= 10) {
         throw new functions.https.HttpsError('resource-exhausted', 'Rate limit exceeded. Try again in a minute.');
@@ -116,7 +158,7 @@ exports.callGemini = functions.https.onCall(async (data, context) => {
     const genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
     try {
-        const result = await model.generateContent(data.prompt);
+        const result = await model.generateContent(cleanPrompt);
         const response = await result.response;
         return { text: response.text() };
     }
@@ -124,5 +166,54 @@ exports.callGemini = functions.https.onCall(async (data, context) => {
         console.error("Gemini server error:", error);
         throw new functions.https.HttpsError('internal', 'AI generation failed.');
     }
+});
+/**
+ * AGENTIC TASKING: Background trigger to auto-generate staff tasks
+ * when sector density hits critical levels (>80%).
+ */
+exports.onQueueUpdateAgentic = functions.firestore
+    .document('queues/{queueId}')
+    .onUpdate(async (change, _context) => {
+    const newData = change.after.data();
+    const oldData = change.before.data();
+    const newDensity = Number(newData?.density ?? 0);
+    const oldDensity = Number(oldData?.density ?? 0);
+    if (!Number.isFinite(newDensity) || !Number.isFinite(oldDensity)) {
+        return null;
+    }
+    // Only act if density just crossed the 80% threshold
+    if (newDensity >= 80 && oldDensity < 80) {
+        const sectorId = newData.sectorId || 'Unknown Sector';
+        const prompt = `
+        VENUE ANALYTICS ALERT: Sector ${sectorId} has reached ${newDensity}% density.
+        Wait time is currently ${newData.waitTime} minutes.
+        ACT AS: A senior stadium operations manager.
+        TASK: Generate a single, clear, high-priority staff instruction to mitigate this density surge.
+        RESPONSE FORMAT: Just the instruction text, max 15 words.
+      `;
+        const apiKey = functions.config().gemini.key;
+        if (!apiKey)
+            return;
+        const genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+        try {
+            const result = await model.generateContent(prompt);
+            const taskText = result.response.text();
+            // Create the task in Firestore for staff to see
+            await admin.firestore().collection('tasks').add({
+                description: taskText,
+                location: sectorId,
+                priority: 'high',
+                status: 'pending',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                generatedBy: 'VenueFlow-AI-Agent'
+            });
+            console.log(`Agentic Task Created for Sector ${sectorId}: ${taskText}`);
+        }
+        catch (err) {
+            console.error("Agentic Task Generation Failed:", err);
+        }
+    }
+    return null;
 });
 //# sourceMappingURL=index.js.map

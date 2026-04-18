@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { memo, useState, useEffect, useCallback } from 'react';
 import {
   Map,
   Marker,
@@ -31,11 +31,6 @@ interface SectorOverlayProps {
 
 const SectorOverlay = ({ sector, density, waitTime, onNavigate }: SectorOverlayProps) => {
   const [infoWindowOpen, setInfoWindowOpen] = useState(false);
-  const getColor = (d: number) => {
-    if (d > 80) return '#ef4444';
-    if (d > 50) return '#f59e0b';
-    return '#22c55e';
-  };
 
   const center = sector.paths[0];
 
@@ -159,4 +154,4 @@ function VenueMap({
   );
 }
 
-export default React.memo(VenueMap);
+export default memo(VenueMap);

@@ -8,9 +8,63 @@ const bq = new BigQuery();
 
 const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.FB_PROJECT_ID || 'venue-flow-default';
 const DATASET_ID = 'venueflow_analytics';
+const PROMPT_MAX_LENGTH = 1000;
 
-export const getBigQueryAnalytics = functions.https.onCall(async (data: any, context: functions.https.CallableContext) => {
-  // Check auth if needed: if (!context.auth) throw new functions.https.HttpsError('unauthenticated', '...');
+interface GeminiRequest {
+  prompt?: unknown;
+  systemInstruction?: unknown;
+  config?: {
+    responseMimeType?: unknown;
+  };
+}
+
+const DISALLOWED_PROMPT_PATTERNS = [
+  /ignore previous instructions/i,
+  /system prompt/i,
+  /you are now a/i,
+  /forget everything/i,
+  /output the internal/i,
+  /reveal your secret/i,
+  /execute command/i,
+];
+
+function sanitizePrompt(rawPrompt: unknown): string {
+  if (typeof rawPrompt !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'Prompt must be a string.');
+  }
+
+  const stripped = rawPrompt.replace(/<[^>]*>?/gm, '').trim();
+  if (!stripped) {
+    throw new functions.https.HttpsError('invalid-argument', 'Prompt cannot be empty.');
+  }
+
+  const boundedPrompt = stripped.slice(0, PROMPT_MAX_LENGTH);
+  if (DISALLOWED_PROMPT_PATTERNS.some((pattern) => pattern.test(boundedPrompt))) {
+    throw new functions.https.HttpsError('invalid-argument', 'Prompt rejected by security policy.');
+  }
+
+  return boundedPrompt;
+}
+
+async function getUserRole(uid: string): Promise<string | null> {
+  const userDoc = await admin.firestore().collection('users').doc(uid).get();
+  if (!userDoc.exists) {
+    return null;
+  }
+
+  const role = userDoc.data()?.role;
+  return typeof role === 'string' ? role : null;
+}
+
+export const getBigQueryAnalytics = functions.https.onCall(async (_data: any, context: functions.https.CallableContext) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be signed in.');
+  }
+
+  const userRole = await getUserRole(context.auth.uid);
+  if (userRole !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Only admins can access analytics.');
+  }
 
   const queries = {
     // (a) Average wait time per sector over last 1 hour
@@ -61,7 +115,7 @@ export const getBigQueryAnalytics = functions.https.onCall(async (data: any, con
 /**
  * Secure wrapper for Gemini API with Rate Limiting
  */
-export const callGemini = functions.https.onCall(async (data: { prompt: string }, context: functions.https.CallableContext) => {
+export const callGemini = functions.https.onCall(async (data: GeminiRequest, context: functions.https.CallableContext) => {
   // 1. Authenticate
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be signed in.');
@@ -70,11 +124,15 @@ export const callGemini = functions.https.onCall(async (data: { prompt: string }
   const uid = context.auth.uid;
   const now = Date.now();
   const oneMinuteAgo = now - 60000;
+  const cleanPrompt = sanitizePrompt(data.prompt);
 
   // 2. Rate Limiting (Max 10 per minute)
   const rateLimitRef = admin.firestore().collection('rateLimits').doc(uid);
   const rateLimitDoc = await rateLimitRef.get();
-  const history: number[] = rateLimitDoc.exists ? (rateLimitDoc.data()?.timestamps || []) : [];
+  const rawHistory = rateLimitDoc.exists ? rateLimitDoc.data()?.timestamps : [];
+  const history: number[] = Array.isArray(rawHistory)
+    ? rawHistory.filter((ts): ts is number => typeof ts === 'number')
+    : [];
   
   const recentRequests = history.filter(ts => ts > oneMinuteAgo);
   if (recentRequests.length >= 10) {
@@ -95,7 +153,7 @@ export const callGemini = functions.https.onCall(async (data: { prompt: string }
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
   try {
-    const result = await model.generateContent(data.prompt);
+    const result = await model.generateContent(cleanPrompt);
     const response = await result.response;
     return { text: response.text() };
   } catch (error) {
@@ -110,15 +168,21 @@ export const callGemini = functions.https.onCall(async (data: { prompt: string }
  */
 export const onQueueUpdateAgentic = functions.firestore
   .document('queues/{queueId}')
-  .onUpdate(async (change, context) => {
+  .onUpdate(async (change, _context) => {
     const newData = change.after.data();
     const oldData = change.before.data();
+    const newDensity = Number(newData?.density ?? 0);
+    const oldDensity = Number(oldData?.density ?? 0);
+
+    if (!Number.isFinite(newDensity) || !Number.isFinite(oldDensity)) {
+      return null;
+    }
 
     // Only act if density just crossed the 80% threshold
-    if (newData.density >= 80 && oldData.density < 80) {
+    if (newDensity >= 80 && oldDensity < 80) {
       const sectorId = newData.sectorId || 'Unknown Sector';
       const prompt = `
-        VENUE ANALYTICS ALERT: Sector ${sectorId} has reached ${newData.density}% density.
+        VENUE ANALYTICS ALERT: Sector ${sectorId} has reached ${newDensity}% density.
         Wait time is currently ${newData.waitTime} minutes.
         ACT AS: A senior stadium operations manager.
         TASK: Generate a single, clear, high-priority staff instruction to mitigate this density surge.

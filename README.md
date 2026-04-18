@@ -89,6 +89,16 @@ graph TD
 
 ---
 
+## 🔐 Security Architecture
+
+- **Auth + RBAC Enforcement**: Firestore access is role-gated (`attendee`, `staff`, `admin`) via [firestore.rules](firestore.rules) and mirrored by callable function checks for sensitive analytics.
+- **Server-side AI Guardrail**: Gemini prompts are validated and sanitized in Cloud Functions before model execution.
+- **Least-Privilege Data Access**: Admin analytics are callable only by authenticated users with `admin` role.
+- **Key Exposure Boundary**: Core Gemini inference keys remain server-only (`functions.config().gemini.key`). Frontend TTS uses optional public `VITE_GEMINI_API_KEY` only when enabled.
+- **Client Security Metadata**: Referrer policy, content-type sniff protection, and feature permissions are set in [index.html](index.html).
+
+---
+
 ## 🚀 Quick Start Guide
 
 ### 1️⃣ Clone & Install
@@ -105,6 +115,8 @@ Create a `.env` file in the root:
 VITE_FIREBASE_API_KEY=your_key
 VITE_FIREBASE_PROJECT_ID=your_id
 VITE_GOOGLE_MAPS_API_KEY=your_maps_key
+# Optional: required only if you want Gemini TTS voice playback in attendee chat
+VITE_GEMINI_API_KEY=your_gemini_tts_key
 ```
 
 ### 3️⃣ Backend Deployment
@@ -123,6 +135,42 @@ We maintain a **90%+ core logic coverage** with Vitest.
 
 ```bash
 npm test
+```
+
+Run the full quality gate used in CI/evaluation:
+
+```bash
+npm run quality:check
+```
+
+Run Firestore Security Rules emulator tests:
+
+```bash
+npm run test:rules
+```
+
+Run focused integration tests (admin analytics auth flow):
+
+```bash
+npm run test:integration
+```
+
+Run Cloud Functions callable authorization tests:
+
+```bash
+npm run test:functions-auth
+```
+
+Run Lighthouse CI with performance budgets:
+
+```bash
+npm run perf:lighthouse
+```
+
+Run the full submission gate (quality + build + functions + rules + lighthouse):
+
+```bash
+npm run check:full
 ```
 - **Gemini Mocking**: Validates AI resilience during downtime.
 - **Queue Logic**: Ensures wait-time calculations are frame-perfect.

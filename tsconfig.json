@@ -15,7 +15,6 @@
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
-    "baseUrl": ".",
     "paths": {
       "@/*": [
         "./src/*"
@@ -28,5 +27,8 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "types": ["vite/client", "google.maps", "node"]
-  }
+  },
+  "exclude": [
+    "functions/**"
+  ]
 }

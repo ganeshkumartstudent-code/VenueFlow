@@ -45,3 +45,7 @@ ui-debug.log*
 # Project specific
 firebase-applet-config.json
 
+# Performance audit artifacts
+.lighthouseci/
+bundle-stats.html
+

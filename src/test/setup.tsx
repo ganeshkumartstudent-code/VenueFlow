@@ -25,6 +25,29 @@ vi.mock('recharts', () => ({
   Area: () => <div />,
 }));
 
+// Mock ScrollArea primitives to avoid async layout side-effects in unit tests
+vi.mock('@/components/ui/scroll-area', () => ({
+  ScrollArea: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
+    <div className={className} data-testid="mock-scroll-area">{children}</div>
+  ),
+  ScrollBar: () => null,
+}));
+
+// Mock Google Maps React components for unit tests
+vi.mock('@vis.gl/react-google-maps', () => ({
+  ApiProvider: ({ children }: { children: React.ReactNode }) => <div data-testid="mock-api-provider">{children}</div>,
+  Map: ({ children, onIdle }: { children?: React.ReactNode; onIdle?: () => void }) => {
+    React.useEffect(() => {
+      onIdle?.();
+    }, [onIdle]);
+    return <div data-testid="mock-map">{children}</div>;
+  },
+  Marker: () => <div data-testid="mock-marker" />,
+  InfoWindow: ({ children }: { children?: React.ReactNode }) => <div data-testid="mock-info-window">{children}</div>,
+  useMap: () => null,
+  useMapsLibrary: (_library: string) => null,
+}));
+
 // Mock Google Generative AI
 vi.mock('@google/genai', () => {
   return {
@@ -65,13 +88,13 @@ vi.mock('firebase/auth', () => ({
 
 vi.mock('firebase/firestore', () => ({
   getFirestore: vi.fn(),
-  collection: vi.fn((db, path) => ({ path })),
+  collection: vi.fn((_db: unknown, path: string) => ({ path })),
   query: vi.fn((q) => q),
   where: vi.fn(),
   orderBy: vi.fn(),
   limit: vi.fn(),
   onSnapshot: vi.fn(() => vi.fn()),
-  doc: vi.fn((db, coll, id) => ({ id, coll })),
+  doc: vi.fn((_db: unknown, coll: string, id: string) => ({ id, coll })),
   getDoc: vi.fn(),
   getDocs: vi.fn(() => ({ empty: true, docs: [] })),
   setDoc: vi.fn(),
@@ -107,6 +130,8 @@ vi.mock('sonner', () => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
   },
 }));
 

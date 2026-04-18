@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { WifiOff, SearchX, Inbox, MessageSquareOff, BarChart3, CloudOff } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { WifiOff, type LucideIcon } from 'lucide-react';
 
 // ── Skeletons ──
 
@@ -40,7 +39,7 @@ export const SkeletonChart = () => (
 
 // ── Empty States ──
 
-export const EmptyState = ({ icon: Icon, title, description }: { icon: any, title: string, description: string }) => (
+export const EmptyState = ({ icon: Icon, title, description }: { icon: LucideIcon; title: string; description: string }) => (
   <div className="flex flex-col items-center justify-center py-10 text-center px-4">
     <div className="rounded-full bg-zinc-900 p-4 mb-4 border border-zinc-800">
       <Icon className="h-8 w-8 text-zinc-600" />
