@@ -6,7 +6,7 @@ import { sanitizeInput } from './sanitizer';
  * Calls the secure backend Cloud Function for Gemini AI processing.
  * This ensures the API key remains server-side and applies rate limiting.
  */
-export async function askGemini(prompt: string, systemInstruction?: string) {
+export async function askGemini(prompt: string, systemInstruction?: string): Promise<string> {
   try {
     // 1. Sanitize user input before sending to backend
     const cleanPrompt = sanitizeInput(prompt);
@@ -19,13 +19,13 @@ export async function askGemini(prompt: string, systemInstruction?: string) {
     });
     
     return (result.data as { text: string }).text;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Gemini Error:", error);
-    
+    const err = error as { code?: string; message?: string };
     // Handle specific rate limit error from backend
-    if (error.code === 'resource-exhausted') {
+    if (err.code === 'resource-exhausted') {
       toast.error("You are asking too many questions! Please wait a minute.");
-    } else if (error.message.includes("injection detected")) {
+    } else if (err.message?.includes("injection detected")) {
       toast.error("Your message was rejected for security reasons.");
     } else {
       toast.error("AI is temporarily unavailable.");
@@ -35,11 +35,16 @@ export async function askGemini(prompt: string, systemInstruction?: string) {
   }
 }
 
+interface SensorData {
+  venueId: string;
+  currentDensity: { sectorId: string; density: number }[];
+}
+
 /**
  * Prediction calls should also move to a secure backend function 
  * if they use sensitive data or the Gemini API directly.
  */
-export async function getCrowdPrediction(sensorData: any) {
+export async function getCrowdPrediction(sensorData: SensorData): Promise<{ predictions: { sectorId: string; predictedDensity: number; recommendation: string }[] } | null> {
   try {
     const callGemini = httpsCallable(functions, 'callGemini');
     const prompt = `Based on this sensor data: ${JSON.stringify(sensorData)}, predict crowd density. Return JSON { "predictions": [...] }`;

@@ -1,23 +1,27 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
-import { TrendingDown, Users, Clock, Download, RefreshCcw } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { TrendingDown, Users, Download, RefreshCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { functions, httpsCallable } from '@/lib/firebase';
 import { toast } from 'sonner';
 import { SkeletonChart } from './StatusUI';
-import { GLOBAL_REALTIME_DATA } from '@/lib/mockData';
 
 import { useCrowdData } from '@/hooks/useCrowdData';
+
+interface WaitTimeRecord { sectorId: string; avgWait: number; wait?: number; }
+interface DensityRecord { sectorId: string; peakDensity: number; density?: number; }
+interface EfficiencyRecord { rate: number; completed: number; total: number; }
+interface AnalyticsData {
+  waitTime: WaitTimeRecord[];
+  density: DensityRecord[];
+  efficiency: EfficiencyRecord;
+}
 
 function AdminAnalytics() {
   const [loading, setLoading] = useState(true);
   const { sectors } = useCrowdData();
-  const [data, setData] = useState<{
-    waitTime: any[];
-    density: any[];
-    efficiency: { rate: number; completed: number; total: number };
-  }>({
+  const [data, setData] = useState<AnalyticsData>({
     waitTime: [],
     density: [],
     efficiency: { rate: 0, completed: 0, total: 0 }
@@ -28,7 +32,7 @@ function AdminAnalytics() {
     try {
       const getBigQueryAnalytics = httpsCallable(functions, 'getBigQueryAnalytics');
       const result = await getBigQueryAnalytics({ limit: 100 });
-      const analytics = result.data as any;
+      const analytics = result.data as AnalyticsData;
       
       setData({
         waitTime: analytics.waitTime || [],
@@ -62,26 +66,17 @@ function AdminAnalytics() {
     fetchAnalytics();
   }, [fetchAnalytics]);
 
-  const waitTimeData = useMemo(() => data.waitTime.map((item: any) => ({
+  const waitTimeData = useMemo(() => data.waitTime.map((item: WaitTimeRecord) => ({
     time: item.sectorId,
     wait: Math.round(item.avgWait)
   })), [data.waitTime]);
 
-  const densityData = useMemo(() => data.density.map((item: any) => ({
+  const densityData = useMemo(() => data.density.map((item: DensityRecord) => ({
     name: item.sectorId,
     density: Math.round(item.peakDensity),
     capacity: 100
   })), [data.density]);
 
-  const avgWait = useMemo(() => {
-    if (waitTimeData.length === 0) return '--';
-    return Math.round(waitTimeData.reduce((a, b) => a + b.wait, 0) / waitTimeData.length);
-  }, [waitTimeData]);
-
-  const peakDensity = useMemo(() => {
-    if (densityData.length === 0) return '--';
-    return Math.max(...densityData.map(d => d.density));
-  }, [densityData]);
 
   return (
     <div className="space-y-6 h-full overflow-auto pb-10" role="region" aria-label="Admin analytics dashboard">
@@ -115,7 +110,7 @@ function AdminAnalytics() {
             <CardContent>
               <div className="flex items-center gap-2">
                 <span className="text-3xl font-bold text-green-500">
-                  {data.waitTime.length > 0 ? Math.round(data.waitTime.reduce((a, b) => a + b.wait, 0) / data.waitTime.length) : '--'}m
+                  {data.waitTime.length > 0 ? Math.round(data.waitTime.reduce((a, b) => a + (b.avgWait ?? b.wait ?? 0), 0) / data.waitTime.length) : '--'}m
                 </span>
                 <TrendingDown className="h-5 w-5 text-green-500" aria-hidden="true" />
               </div>
@@ -132,7 +127,7 @@ function AdminAnalytics() {
             <CardContent>
               <div className="flex items-center gap-2">
                 <span className="text-3xl font-bold text-orange-500">
-                  {data.density.length > 0 ? Math.max(...data.density.map(d => d.density)) : '--'}%
+                  {data.density.length > 0 ? Math.max(...data.density.map(d => d.peakDensity)) : '--'}%
                 </span>
                 <Users className="h-5 w-5 text-orange-500" aria-hidden="true" />
               </div>

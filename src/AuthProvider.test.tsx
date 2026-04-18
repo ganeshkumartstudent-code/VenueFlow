@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { onAuthStateChanged, getAuth } from 'firebase/auth';
-import { getDoc, doc, setDoc } from 'firebase/firestore';
-import React from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { getDoc, setDoc } from 'firebase/firestore';
 
 // Component to test the hook
 const TestComponent = () => {
@@ -26,17 +25,16 @@ describe('AuthProvider', () => {
     const mockUser = { uid: '123', email: 'test@example.com', displayName: 'Test User' };
     const mockProfile = { uid: '123', role: 'admin', name: 'Test User' };
 
-    // Simulate auth state change
-    (onAuthStateChanged as any).mockImplementation((auth, callback) => {
+    vi.mocked(onAuthStateChanged).mockImplementation((_auth, callback: any) => {
       callback(mockUser);
       return () => {};
     });
 
     // Mock Firestore response
-    (getDoc as any).mockResolvedValue({
+    vi.mocked(getDoc).mockResolvedValue({
       exists: () => true,
       data: () => mockProfile
-    });
+    } as any);
 
     render(
       <AuthProvider>
@@ -53,14 +51,14 @@ describe('AuthProvider', () => {
   it('should create a new profile if one does not exist', async () => {
     const mockUser = { uid: '456', email: 'new@example.com', displayName: 'New User' };
 
-    (onAuthStateChanged as any).mockImplementation((auth, callback) => {
+    vi.mocked(onAuthStateChanged).mockImplementation((_auth, callback: any) => {
       callback(mockUser);
       return () => {};
     });
 
-    (getDoc as any).mockResolvedValue({
+    vi.mocked(getDoc).mockResolvedValue({
       exists: () => false
-    });
+    } as any);
 
     render(
       <AuthProvider>
@@ -80,7 +78,7 @@ describe('AuthProvider', () => {
   });
 
   it('should handle unauthenticated state', async () => {
-    (onAuthStateChanged as any).mockImplementation((auth: any, callback: any) => {
+    vi.mocked(onAuthStateChanged).mockImplementation((_auth, callback: any) => {
       callback(null);
       return () => {};
     });
@@ -100,7 +98,7 @@ describe('AuthProvider', () => {
   it('should fallback to guest mode if auth times out', async () => {
     vi.useFakeTimers();
     
-    (onAuthStateChanged as any).mockImplementation(() => {
+    vi.mocked(onAuthStateChanged).mockImplementation(() => {
       return () => {};
     });
 

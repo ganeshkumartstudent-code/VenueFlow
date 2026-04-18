@@ -21,7 +21,8 @@ export interface StaffTask {
   location: string;
   priority: 'low' | 'medium' | 'high';
   status: 'pending' | 'in-progress' | 'completed';
-  createdAt: any;
+  createdAt: unknown; // Firestore Timestamp or server sentinel
+  assignedTo?: string;
   generatedBy?: string;
 }
 

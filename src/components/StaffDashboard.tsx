@@ -3,16 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ShieldAlert, Users, MessageSquare, CheckCircle2, AlertCircle, TrendingUp, Map as MapIcon } from 'lucide-react';
+import { MessageSquare, CheckCircle2, AlertCircle, TrendingUp } from 'lucide-react';
 import { db, collection, onSnapshot, query, orderBy, limit, addDoc, serverTimestamp, updateDoc, doc, where } from '@/lib/firebase';
-import { useAuth } from '@/contexts/AuthContext';
 import { getCrowdPrediction } from '@/lib/gemini';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { SkeletonHeatmap, EmptyState } from './StatusUI';
 import { Inbox } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
-import { GLOBAL_REALTIME_DATA } from '@/lib/mockData';
+import { StaffTask } from '@/types';
 
 // FIX: Helper maps density number → accessible label
 const getDensityLabel = (density: number) => {
@@ -25,11 +24,13 @@ import { useCrowdData } from '@/hooks/useCrowdData';
 
 function StaffDashboard() {
   const shouldReduceMotion = useReducedMotion();
-  const { profile } = useAuth();
   const { sectors } = useCrowdData();
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [predictions, setPredictions] = useState<any[]>(
+  interface Prediction { sectorId: string; predictedDensity: number; recommendation: string; }
+  interface StaffMessage { id: string; senderName: string; text: string; channel: string; }
+
+  const [tasks, setTasks] = useState<StaffTask[]>([]);
+  const [messages, setMessages] = useState<StaffMessage[]>([]);
+  const [predictions, setPredictions] = useState<Prediction[]>(
     sectors.map(s => ({
       sectorId: s.id,
       predictedDensity: s.density,
@@ -45,12 +46,12 @@ function StaffDashboard() {
   useEffect(() => {
     const tasksQ = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(20));
     const tasksUnsub = onSnapshot(tasksQ, (snapshot) => {
-      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setTasks(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StaffTask)));
     });
 
     const msgsQ = query(collection(db, 'messages'), where('channel', '==', 'staff'), orderBy('timestamp', 'desc'), limit(50));
     const msgsUnsub = onSnapshot(msgsQ, (snapshot) => {
-      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setMessages(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StaffMessage)));
     });
 
     return () => {
@@ -92,7 +93,7 @@ function StaffDashboard() {
     setLoading(false);
   };
 
-  const completeTask = async (taskId: string, description: string) => {
+  const completeTask = async (taskId: string) => {
     await updateDoc(doc(db, 'tasks', taskId), { status: 'completed' });
     toast.success("Task completed");
   };
@@ -317,7 +318,7 @@ function StaffDashboard() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => completeTask(task.id, task.description)}
+                          onClick={() => completeTask(task.id)}
                           className="h-8 w-8 text-green-500 hover:text-green-400"
                           aria-label={`Mark task complete: ${task.description}`}
                         >

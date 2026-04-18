@@ -35,10 +35,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       tenantId: null,
       delete: async () => {},
       getIdToken: async () => '',
-      getIdTokenResult: async () => ({} as any),
+      getIdTokenResult: async () => ({} as unknown as import('firebase/auth').IdTokenResult),
       reload: async () => {},
       toJSON: () => ({}),
-    } as FirebaseUser);
+    } as unknown as FirebaseUser);
     setProfile({
       uid: 'guest',
       email: 'guest@example.com',

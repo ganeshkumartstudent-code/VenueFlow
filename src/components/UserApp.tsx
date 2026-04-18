@@ -1,36 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Camera, MapPin, Navigation, MessageCircle, Send, Users, Clock, AlertTriangle } from 'lucide-react';
+import { Navigation, MessageCircle, Send, Users, Clock, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { askGemini } from '@/lib/gemini';
-import { db, collection, onSnapshot, query, orderBy, limit } from '@/lib/firebase';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { SkeletonList, EmptyState } from './StatusUI';
-import { SearchX, MessageSquareOff } from 'lucide-react';
+import { MessageSquareOff } from 'lucide-react';
 import VenueMap from './VenueMap';
-import { GLOBAL_REALTIME_DATA } from '@/lib/mockData';
+import { useCrowdData } from '@/hooks/useCrowdData';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
-
-// FIX: Map the density indicator colour to a human-readable label for
-// colour-blind and screen-reader users.
-const DENSITY_LABELS: Record<number, string> = {};
-
-import { useCrowdData } from '@/hooks/useCrowdData';
 
 export default function UserApp() {
   const { queues, loading: queuesLoading } = useCrowdData();
   const [mode, setMode] = useState<'map' | 'ar' | 'chat'>('map');
   const [messages, setMessages] = useState<{ role: 'user' | 'ai', text: string }[]>([]);
   const [input, setInput] = useState('');
-  const [isScanning, setIsScanning] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulatedLocation, setSimulatedLocation] = useState<google.maps.LatLngLiteral | null>(null);
+
   
   const chatInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -108,9 +101,10 @@ export default function UserApp() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       if (videoRef.current) videoRef.current.srcObject = stream;
-    } catch (err: any) {
-      console.error("Camera error:", err);
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+    } catch (err: unknown) {
+      const camErr = err as DOMException | Error;
+      console.error("Camera error:", camErr);
+      if (camErr.name === 'NotAllowedError' || camErr.name === 'PermissionDeniedError') {
         setCameraError("Camera access was denied. Please enable permissions in your browser settings to use AR navigation.");
       } else {
         setCameraError("Could not access camera. Please ensure no other app is using it.");
