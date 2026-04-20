@@ -1,8 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { askGemini, getCrowdPrediction } from './gemini';
 
+type TestGlobal = typeof globalThis & {
+  geminiMock: {
+    generateContent: ReturnType<typeof vi.fn>;
+  };
+};
+
 // Use the global mock created in setup.tsx
-const mockGenerateContent = (globalThis as any).geminiMock.generateContent;
+const testGlobal = globalThis as TestGlobal;
+const mockGenerateContent = testGlobal.geminiMock.generateContent;
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 describe('Gemini Service', () => {

@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const queryMock = vi.fn();
 const getUserDocMock = vi.fn();
+type MockCallableContext = { auth: null | { uid: string } };
+type BigQueryCallable = (data: unknown, context: MockCallableContext) => Promise<unknown>;
 
 vi.mock('@google-cloud/bigquery', () => ({
   BigQuery: class BigQueryMock {
@@ -10,18 +12,21 @@ vi.mock('@google-cloud/bigquery', () => ({
 }));
 
 vi.mock('firebase-admin', () => {
-  const firestoreMock = vi.fn(() => ({
-    collection: vi.fn(() => ({
-      doc: vi.fn(() => ({
-        get: getUserDocMock,
+  const firestoreMock = Object.assign(
+    vi.fn(() => ({
+      collection: vi.fn(() => ({
+        doc: vi.fn(() => ({
+          get: getUserDocMock,
+        })),
+        add: vi.fn(),
       })),
-      add: vi.fn(),
     })),
-  })) as any;
-
-  firestoreMock.FieldValue = {
-    serverTimestamp: vi.fn(() => 'mock-server-timestamp'),
-  };
+    {
+      FieldValue: {
+        serverTimestamp: vi.fn(() => 'mock-server-timestamp'),
+      },
+    }
+  );
 
   return {
     initializeApp: vi.fn(),
@@ -63,9 +68,9 @@ vi.mock('firebase-functions', () => {
   };
 });
 
-async function loadCallable() {
+async function loadCallable(): Promise<BigQueryCallable> {
   const mod = await import('./index');
-  return mod.getBigQueryAnalytics;
+  return mod.getBigQueryAnalytics as unknown as BigQueryCallable;
 }
 
 describe('getBigQueryAnalytics authorization', () => {
@@ -77,7 +82,7 @@ describe('getBigQueryAnalytics authorization', () => {
   it('throws unauthenticated error for anonymous callers', async () => {
     const getBigQueryAnalytics = await loadCallable();
 
-    await expect(getBigQueryAnalytics({}, { auth: null } as any)).rejects.toMatchObject({
+    await expect(getBigQueryAnalytics({}, { auth: null })).rejects.toMatchObject({
       code: 'unauthenticated',
     });
   });
@@ -90,7 +95,7 @@ describe('getBigQueryAnalytics authorization', () => {
 
     const getBigQueryAnalytics = await loadCallable();
 
-    await expect(getBigQueryAnalytics({}, { auth: { uid: 'staff-1' } } as any)).rejects.toMatchObject({
+    await expect(getBigQueryAnalytics({}, { auth: { uid: 'staff-1' } })).rejects.toMatchObject({
       code: 'permission-denied',
     });
   });
@@ -107,7 +112,7 @@ describe('getBigQueryAnalytics authorization', () => {
       .mockResolvedValueOnce([[{ rate: 0.8, completed: 8, total: 10 }]]);
 
     const getBigQueryAnalytics = await loadCallable();
-    const result = await getBigQueryAnalytics({}, { auth: { uid: 'admin-1' } } as any);
+    const result = await getBigQueryAnalytics({}, { auth: { uid: 'admin-1' } });
 
     expect(queryMock).toHaveBeenCalledTimes(3);
     expect(result).toEqual({

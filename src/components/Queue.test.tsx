@@ -3,6 +3,11 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import UserApp from './UserApp';
 import { onSnapshot } from 'firebase/firestore';
 
+type QueueDoc = { waitTime: number; type: string; sectorId: string; density: number };
+type Snapshot<TDoc> = { empty?: boolean; docs: Array<{ id: string; data: () => TDoc }> };
+type QueueSnapshotCallback = (snapshot: Snapshot<QueueDoc>) => void;
+type QueryRef = { path?: string };
+
 // Mock Auth context for UserApp
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { uid: '123' }, profile: { role: 'attendee' }, loading: false })
@@ -20,9 +25,9 @@ describe('Queue Component (in UserApp)', () => {
     ];
 
     // Mock Firebase onSnapshot
-    (onSnapshot as any).mockImplementation((
-      queryRef: { path?: string },
-      callback: (snapshot: { empty?: boolean; docs: Array<{ id: string; data: () => { waitTime: number; type: string; sectorId: string; density: number } }> }) => void
+    vi.mocked(onSnapshot).mockImplementation(((
+      queryRef: QueryRef,
+      callback: QueueSnapshotCallback
     ) => {
       if (queryRef.path === 'queues') {
         callback({
@@ -36,7 +41,7 @@ describe('Queue Component (in UserApp)', () => {
         callback({ empty: true, docs: [] });
       }
       return () => {};
-    });
+    }) as unknown as typeof onSnapshot);
 
     render(<UserApp />);
 
@@ -49,9 +54,9 @@ describe('Queue Component (in UserApp)', () => {
   });
 
   it('should fall back to mock queue data when no live queues exist', async () => {
-    (onSnapshot as any).mockImplementation((
-      queryRef: { path?: string },
-      callback: (snapshot: { empty?: boolean; docs: Array<{ id: string; data: () => Record<string, unknown> }> }) => void
+    vi.mocked(onSnapshot).mockImplementation(((
+      queryRef: QueryRef,
+      callback: (snapshot: Snapshot<Record<string, unknown>>) => void
     ) => {
       if (queryRef.path === 'queues') {
         callback({ empty: true, docs: [] });
@@ -59,7 +64,7 @@ describe('Queue Component (in UserApp)', () => {
         callback({ empty: true, docs: [] });
       }
       return () => {};
-    });
+    }) as unknown as typeof onSnapshot);
 
     render(<UserApp />);
     expect(await screen.findByText(/Sector S4/i)).toBeInTheDocument();
@@ -67,10 +72,10 @@ describe('Queue Component (in UserApp)', () => {
   });
 
   it('should update wait times in real-time when data changes', async () => {
-    let snapshotCallback: (snapshot: { empty?: boolean; docs: Array<{ id: string; data: () => { waitTime: number; type: string; sectorId: string; density: number } }> }) => void = () => {};
-    (onSnapshot as any).mockImplementation((
-      queryRef: { path?: string },
-      callback: (snapshot: { empty?: boolean; docs: Array<{ id: string; data: () => { waitTime: number; type: string; sectorId: string; density: number } }> }) => void
+    let snapshotCallback: QueueSnapshotCallback = () => {};
+    vi.mocked(onSnapshot).mockImplementation(((
+      queryRef: QueryRef,
+      callback: QueueSnapshotCallback
     ) => {
       if (queryRef.path === 'queues') {
         snapshotCallback = callback;
@@ -82,7 +87,7 @@ describe('Queue Component (in UserApp)', () => {
         callback({ empty: true, docs: [] });
       }
       return () => {};
-    });
+    }) as unknown as typeof onSnapshot);
 
     render(<UserApp />);
     expect(await screen.findByText('10m')).toBeInTheDocument();

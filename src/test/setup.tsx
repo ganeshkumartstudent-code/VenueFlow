@@ -2,26 +2,42 @@ import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 import React from 'react';
 
+type TestGlobal = typeof globalThis & {
+  geminiMock: {
+    generateContent: (payload: { contents: string; config?: Record<string, unknown> }) => Promise<{
+      text: string;
+      candidates: Array<{ content: { parts: Array<{ text: string }> } }>;
+    }>;
+  };
+};
+
+type ChildrenProps = {
+  children?: React.ReactNode;
+};
+
+const testGlobal = globalThis as TestGlobal;
+const geminiGenerateContent = vi.fn(async () => ({
+  text: 'Mock AI Response',
+  candidates: [{ content: { parts: [{ text: 'Mock AI Response' }] } }],
+}));
+
 // Global mock state for Gemini
-(globalThis as any).geminiMock = {
-  generateContent: vi.fn().mockResolvedValue({
-    text: 'Mock AI Response',
-    candidates: [{ content: { parts: [{ text: 'Mock AI Response' }] } }]
-  })
+testGlobal.geminiMock = {
+  generateContent: geminiGenerateContent,
 };
 
 // Mock Recharts
 vi.mock('recharts', () => ({
-  ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
-  BarChart: ({ children }: any) => <div data-testid="bar-chart">{children}</div>,
+  ResponsiveContainer: ({ children }: ChildrenProps) => <div data-testid="responsive-container">{children}</div>,
+  BarChart: ({ children }: ChildrenProps) => <div data-testid="bar-chart">{children}</div>,
   Bar: () => <div />,
   XAxis: () => <div />,
   YAxis: () => <div />,
   CartesianGrid: () => <div />,
   Tooltip: () => <div />,
-  LineChart: ({ children }: any) => <div data-testid="line-chart">{children}</div>,
+  LineChart: ({ children }: ChildrenProps) => <div data-testid="line-chart">{children}</div>,
   Line: () => <div />,
-  AreaChart: ({ children }: any) => <div data-testid="area-chart">{children}</div>,
+  AreaChart: ({ children }: ChildrenProps) => <div data-testid="area-chart">{children}</div>,
   Area: () => <div />,
 }));
 
@@ -54,10 +70,10 @@ vi.mock('@google/genai', () => {
     GoogleGenAI: function() {
       return {
         getGenerativeModel: vi.fn().mockReturnValue({
-          generateContent: (globalThis as any).geminiMock.generateContent,
+          generateContent: testGlobal.geminiMock.generateContent,
         }),
         models: {
-          generateContent: (globalThis as any).geminiMock.generateContent,
+          generateContent: testGlobal.geminiMock.generateContent,
         }
       };
     },
@@ -105,8 +121,8 @@ vi.mock('firebase/firestore', () => ({
 
 vi.mock('firebase/functions', () => ({
   getFunctions: vi.fn(),
-  httpsCallable: vi.fn(() => vi.fn(async (data) => {
-    const mock = (globalThis as any).geminiMock;
+  httpsCallable: vi.fn(() => vi.fn(async (data: { prompt: string; systemInstruction?: string; config?: Record<string, unknown> }) => {
+    const mock = testGlobal.geminiMock;
     // Map the Cloud Function call to the geminiMock for compatibility with existing tests
     const response = await mock.generateContent({
       contents: data.prompt,
@@ -138,7 +154,7 @@ vi.mock('sonner', () => ({
 // Global window mocks
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: vi.fn().mockImplementation(query => ({
+  value: vi.fn().mockImplementation((query: string) => ({
     matches: false,
     media: query,
     onchange: null,

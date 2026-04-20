@@ -25,8 +25,6 @@ export async function seedMockData() {
   
   if (!venuesSnap.empty && !queuesSnap.empty) return; 
 
-  console.log("Seeding fresh real-time data...");
-
   const venueId = 'stadium-main';
   await setDoc(doc(db, 'venues', venueId), {
     name: GLOBAL_REALTIME_DATA.venueName,
@@ -60,6 +58,4 @@ export async function seedMockData() {
   for (const m of messages) {
     await setDoc(doc(db, 'messages', m.id), { ...m, timestamp: serverTimestamp() });
   }
-
-  console.log("Mock data seeded successfully.");
 }

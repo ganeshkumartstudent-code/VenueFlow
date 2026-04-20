@@ -6,6 +6,7 @@ import { getDoc, setDoc } from 'firebase/firestore';
 
 let consoleLogSpy: ReturnType<typeof vi.spyOn>;
 let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+type MockAuthUser = { uid: string; email: string; displayName?: string };
 
 // Component to test the hook
 const TestComponent = () => {
@@ -35,16 +36,16 @@ describe('AuthProvider', () => {
     const mockUser = { uid: '123', email: 'test@example.com', displayName: 'Test User' };
     const mockProfile = { uid: '123', role: 'admin', name: 'Test User' };
 
-    vi.mocked(onAuthStateChanged).mockImplementation((_auth, callback: any) => {
-      callback(mockUser);
+    vi.mocked(onAuthStateChanged).mockImplementation(((_auth: unknown, callback: unknown) => {
+      (callback as (user: MockAuthUser | null) => void)(mockUser);
       return () => {};
-    });
+    }) as unknown as typeof onAuthStateChanged);
 
     // Mock Firestore response
     vi.mocked(getDoc).mockResolvedValue({
       exists: () => true,
       data: () => mockProfile
-    } as any);
+    } as unknown as Awaited<ReturnType<typeof getDoc>>);
 
     render(
       <AuthProvider>
@@ -61,14 +62,14 @@ describe('AuthProvider', () => {
   it('should create a new profile if one does not exist', async () => {
     const mockUser = { uid: '456', email: 'new@example.com', displayName: 'New User' };
 
-    vi.mocked(onAuthStateChanged).mockImplementation((_auth, callback: any) => {
-      callback(mockUser);
+    vi.mocked(onAuthStateChanged).mockImplementation(((_auth: unknown, callback: unknown) => {
+      (callback as (user: MockAuthUser | null) => void)(mockUser);
       return () => {};
-    });
+    }) as unknown as typeof onAuthStateChanged);
 
     vi.mocked(getDoc).mockResolvedValue({
       exists: () => false
-    } as any);
+    } as unknown as Awaited<ReturnType<typeof getDoc>>);
 
     render(
       <AuthProvider>
@@ -88,10 +89,10 @@ describe('AuthProvider', () => {
   });
 
   it('should handle unauthenticated state', async () => {
-    vi.mocked(onAuthStateChanged).mockImplementation((_auth, callback: any) => {
-      callback(null);
+    vi.mocked(onAuthStateChanged).mockImplementation(((_auth: unknown, callback: unknown) => {
+      (callback as (user: MockAuthUser | null) => void)(null);
       return () => {};
-    });
+    }) as unknown as typeof onAuthStateChanged);
 
     render(
       <AuthProvider>

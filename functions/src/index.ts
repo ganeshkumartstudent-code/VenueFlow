@@ -56,7 +56,7 @@ async function getUserRole(uid: string): Promise<string | null> {
   return typeof role === 'string' ? role : null;
 }
 
-export const getBigQueryAnalytics = functions.https.onCall(async (_data: any, context: functions.https.CallableContext) => {
+export const getBigQueryAnalytics = functions.https.onCall(async (_data: unknown, context: functions.https.CallableContext) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be signed in.');
   }

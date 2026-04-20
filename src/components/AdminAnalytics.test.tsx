@@ -35,7 +35,7 @@ describe('AdminAnalytics authorization integration', () => {
       },
     });
 
-    vi.mocked(httpsCallable).mockReturnValue(callableMock as any);
+    vi.mocked(httpsCallable).mockReturnValue(callableMock as unknown as ReturnType<typeof httpsCallable>);
 
     render(<AdminAnalytics />);
 
@@ -50,7 +50,7 @@ describe('AdminAnalytics authorization integration', () => {
 
   it('falls back gracefully when callable returns permission-denied', async () => {
     const callableMock = vi.fn().mockRejectedValue({ code: 'permission-denied' });
-    vi.mocked(httpsCallable).mockReturnValue(callableMock as any);
+    vi.mocked(httpsCallable).mockReturnValue(callableMock as unknown as ReturnType<typeof httpsCallable>);
 
     render(<AdminAnalytics />);
 

@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import StaffDashboard from './StaffDashboard';
 import { getCrowdPrediction } from '@/lib/gemini';
-import { addDoc } from 'firebase/firestore';
+import { addDoc, onSnapshot } from 'firebase/firestore';
+
+type TaskDoc = { description: string; status: string; priority: string; location: string };
+type QueryRef = { path?: string };
+type Snapshot<TDoc> = { empty?: boolean; docs: Array<{ id: string; data: () => TDoc }> };
+type SnapshotCallback<TDoc> = (snapshot: Snapshot<TDoc>) => void;
 
 // Mock everything needed
 vi.mock('@/lib/gemini', () => ({
@@ -20,7 +25,7 @@ describe('Agentic Task Assignment Logic', () => {
 
   it('should auto-assign tasks when predicted density exceeds 80%', async () => {
     // Mock Gemini prediction result with high density in S3
-    (getCrowdPrediction as any).mockResolvedValue({
+    vi.mocked(getCrowdPrediction).mockResolvedValue({
       predictions: [
         { sectorId: 'S3', predictedDensity: 92, recommendation: 'Redirect traffic to Gate C' },
         { sectorId: 'S1', predictedDensity: 40, recommendation: 'No action' }
@@ -49,7 +54,7 @@ describe('Agentic Task Assignment Logic', () => {
   });
 
   it('should not assign tasks when density is below threshold', async () => {
-    (getCrowdPrediction as any).mockResolvedValue({
+    vi.mocked(getCrowdPrediction).mockResolvedValue({
       predictions: [
         { sectorId: 'S1', predictedDensity: 30, recommendation: 'All clear' }
       ]
@@ -72,10 +77,9 @@ describe('Agentic Task Assignment Logic', () => {
 
     // We need to trigger completeTask. 
     // Tasks are rendered from onSnapshot. Let's mock the snapshot.
-    const { onSnapshot } = await import('firebase/firestore');
-    (onSnapshot as any).mockImplementation((
-      queryRef: { path?: string },
-      callback: (snapshot: { empty?: boolean; docs: Array<{ id: string; data: () => Record<string, unknown> }> }) => void
+    vi.mocked(onSnapshot).mockImplementation(((
+      queryRef: QueryRef,
+      callback: SnapshotCallback<TaskDoc>
     ) => {
       if (queryRef.path === 'tasks') {
         callback({
@@ -93,7 +97,7 @@ describe('Agentic Task Assignment Logic', () => {
         callback({ empty: true, docs: [] });
       }
       return () => {};
-    });
+    }) as unknown as typeof onSnapshot);
 
     render(<StaffDashboard />);
 
@@ -110,10 +114,9 @@ describe('Agentic Task Assignment Logic', () => {
 
   it('should display task list correctly from Firestore', async () => {
     // Mock the snapshot for tasks
-    const { onSnapshot } = await import('firebase/firestore');
-    (onSnapshot as any).mockImplementation((
-      queryRef: { path?: string },
-      callback: (snapshot: { empty?: boolean; docs: Array<{ id: string; data: () => Record<string, unknown> }> }) => void
+    vi.mocked(onSnapshot).mockImplementation(((
+      queryRef: QueryRef,
+      callback: SnapshotCallback<TaskDoc>
     ) => {
       if (queryRef.path === 'tasks') {
         callback({
@@ -131,7 +134,7 @@ describe('Agentic Task Assignment Logic', () => {
         callback({ empty: true, docs: [] });
       }
       return () => {};
-    });
+    }) as unknown as typeof onSnapshot);
 
     render(<StaffDashboard />);
     
