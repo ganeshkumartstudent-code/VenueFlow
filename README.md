@@ -131,7 +131,7 @@ firebase deploy --only functions,firestore:rules
 ---
 
 ## 🧪 Robust Testing Suite
-We maintain a **90%+ core logic coverage** with Vitest.
+Core logic quality is enforced with TypeScript checks, ESLint, Vitest coverage thresholds, and duplication detection.
 
 ```bash
 npm test
@@ -141,6 +141,20 @@ Run the full quality gate used in CI/evaluation:
 
 ```bash
 npm run quality:check
+```
+
+GitHub Actions enforces the same gate on every pull request and push via `.github/workflows/quality.yml`.
+
+Run coverage directly:
+
+```bash
+npm run test:coverage
+```
+
+Run duplicate-code detection directly:
+
+```bash
+npm run quality:duplication
 ```
 
 Run Firestore Security Rules emulator tests:
